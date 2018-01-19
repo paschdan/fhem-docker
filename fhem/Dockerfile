@@ -70,7 +70,13 @@ libtext-csv-perl \
 libtext-diff-perl \
 libtimedate-perl \
 libwww-perl \
-libxml-simple-perl
+libxml-simple-perl \
+libcrypt-cbc-perl \
+libcrypt-rijndael-perl \
+libssl-dev
+
+# init AES
+RUN cpan Crypt/OpenSSL/AES.pm
 
 # Install fhem
 RUN echo Europe/Berlin > /etc/timezone && dpkg-reconfigure tzdata
