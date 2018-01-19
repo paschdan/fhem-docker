@@ -1,4 +1,4 @@
-FROM debian:jessie
+FROM resin/rpi-raspbian:jessie
 
 MAINTAINER Matthias Kleine <info@haus-automatisierung.com>
 
