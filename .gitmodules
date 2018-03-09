@@ -1,0 +1,3 @@
+[submodule "fhem/core/www/tablet"]
+	path = fhem/core/www/tablet
+	url = https://github.com/paschdan/tablet-ui
