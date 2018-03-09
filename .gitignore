@@ -9,3 +9,4 @@
 /mysql/data/*
 /mqtt/log/*
 /mqtt/data/*
+habridge/data/*
