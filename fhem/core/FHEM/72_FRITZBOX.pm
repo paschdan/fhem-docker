@@ -1,5 +1,5 @@
 ###############################################################
-# $Id: 72_FRITZBOX.pm 15456 2017-11-19 13:40:50Z tupol $
+# $Id: 72_FRITZBOX.pm 16187 2018-02-15 18:14:12Z tupol $
 #
 #  72_FRITZBOX.pm 
 #
@@ -133,7 +133,7 @@ while (my ($key, $value) = each %ringTone) {
    $ringToneNumber{lc $value}=$key;
 }
 
-my %alarmDays = qw{1 Mo 2 Tu 4 We 8 Th 16 Fr 32 Sa 64 So};
+my %alarmDays = qw{1 Mo 2 Tu 4 We 8 Th 16 Fr 32 Sa 64 Su};
  
 my %userType = qw{1 IP 2 PC-User 3 Default 4 Guest};
 
@@ -227,7 +227,7 @@ sub FRITZBOX_Define($$)
 
    $hash->{STATE}              = "Initializing";
    $hash->{INTERVAL}           = 300; 
-   $hash->{fhem}{modulVersion} = '$Date: 2017-11-19 14:40:50 +0100 (Sun, 19 Nov 2017) $';
+   $hash->{fhem}{modulVersion} = '$Date: 2018-02-15 19:14:12 +0100 (Thu, 15 Feb 2018) $';
    $hash->{fhem}{lastHour}     = 0;
    $hash->{fhem}{LOCAL}        = 0;
 
@@ -678,9 +678,11 @@ sub FRITZBOX_Readout_Start($)
    if( $interval != 0 ) {
       RemoveInternalTimer($hash->{helper}{TimerReadout});
       InternalTimer(gettimeofday()+$interval, "FRITZBOX_Readout_Start", $hash->{helper}{TimerReadout}, 1);
-      readingsSingleUpdate($hash, "state", "disabled", 1)     if AttrVal($name, "disable", 0 ) == 1;
-      return undef if( AttrVal($name, "disable", 0 ) == 1 );
-  }
+      if( AttrVal( $name, "disable", 0 ) == 1 ) {
+		readingsSingleUpdate( $hash, "state", "disabled", 1 );
+		return undef;
+	  }
+   }
 
 # Kill running process if "set update" is used
    if ( exists( $hash->{helper}{READOUT_RUNNING_PID} ) && $hash->{fhem}{LOCAL} == 1 ) {
@@ -1287,8 +1289,8 @@ sub FRITZBOX_Readout_Run_Web($)
    $queryStr .= "&wlanList=wlan:settings/wlanlist/list(mac,speed,speed_rx,rssi)"; # WLAN devices
    $queryStr .= "&wlanListNew=wlan:settings/wlanlist/list(mac,speed,rssi)"; # WLAN devices fw>=6.69
    #wlan:settings/wlanlist/list(hostname,mac,UID,state,rssi,quality,is_turbo,cipher,wmm_active,powersave,is_ap,ap_state,is_repeater,flags,flags_set,mode,is_guest,speed,speed_rx,channel_width,streams)   #wlan:settings/wlanlist/list(hostname,mac,UID,state,rssi,quality,is_turbo,wmm_active,cipher,powersave,is_repeater,flags,flags_set,mode,is_guest,speed,speed_rx,speed_rx_max,speed_tx_max,channel_width,streams,mu_mimo_group,is_fail_client)   
-   $queryStr .= "&lanDevice=landevice:settings/landevice/list(ip,ethernet,ethernet_port,guest,name,mac,active,online,wlan,speed,UID)"; # LAN devices
-   $queryStr .= "&lanDeviceNew=landevice:settings/landevice/list(ip,ethernet,guest,name,mac,active,online,wlan,speed,UID)"; # LAN devices fw>=6.69
+   $queryStr .= "&lanDevice=landevice:settings/landevice/list(mac,ip,ethernet,ethernet_port,guest,name,active,online,wlan,speed,UID)"; # LAN devices
+   $queryStr .= "&lanDeviceNew=landevice:settings/landevice/list(mac,ip,ethernet,guest,name,active,online,wlan,speed,UID)"; # LAN devices fw>=6.69
    #landevice:settings/landevice/list(name,ip,mac,UID,dhcp,wlan,ethernet,active,static_dhcp,manu_name,wakeup,deleteable,source,online,speed,wlan_UIDs,auto_wakeup,guest,url,wlan_station_type,vendorname)
    #landevice:settings/landevice/list(name,ip,mac,parentname,parentuid,ethernet_port,wlan_show_in_monitor,plc,ipv6_ifid,parental_control_abuse,plc_UIDs)   #landevice:settings/landevice/list(name,ip,mac,UID,dhcp,wlan,ethernet,active,static_dhcp,manu_name,wakeup,deleteable,source,online,speed,wlan_UIDs,auto_wakeup,guest,url,wlan_station_type,vendorname,parentname,parentuid,ethernet_port,wlan_show_in_monitor,plc,ipv6_ifid,parental_control_abuse,plc_UIDs)
    $queryStr .= "&init=telcfg:settings/Foncontrol"; # Init
@@ -1359,10 +1361,18 @@ sub FRITZBOX_Readout_Run_Web($)
       $returnStr .= "|" . join('|', @roReadings )     if int @roReadings;
       return $name."|".encode_base64($returnStr,"");
    }
+   
+   if ( defined $result->{AuthorizationRequired} ) {
+      FRITZBOX_Log $hash, 2, "Error: AuthorizationRequired=".$result->{AuthorizationRequired};
+      my $returnStr = "Error|Authorization required";
+      $returnStr .= "|fhem->sidTime|0"    if defined $result->{ResetSID};
+      $returnStr .= "|" . join('|', @roReadings )     if int @roReadings;
+      return $name."|".encode_base64($returnStr,"");
+   }
 
-   # !!! copes with fw>=6.69 !!!
+   # !!! copes with fw 6.69 !!!
    if ( ref $result->{wlanList} ne 'ARRAY' ) {
-      FRITZBOX_Log $hash, 4, "Recognized query answer of firmware >= 6.69";
+      FRITZBOX_Log $hash, 4, "Recognized query answer of firmware 6.69";
       my $result2;
       my $newQueryPart; 
       
@@ -1412,19 +1422,19 @@ sub FRITZBOX_Readout_Run_Web($)
       $result2 = FRITZBOX_Web_Query( $hash, $queryStr );
       %{$result} = ( %{$result}, %{$result2 } );
       
-    # create fields for wlanList-Entries (for fw>=6.69)
+    # create fields for wlanList-Entries (for fw 6.69)
       $result->{wlanList} = $result->{wlanListNew};
       foreach ( @{ $result->{wlanList} } ) {
          $_->{speed_rx} = $result->{ $_->{_node} }; 
       }
 
-    # Create fields for lanDevice-Entries (for fw>=6.69)
+    # Create fields for lanDevice-Entries (for fw 6.69)
       $result->{lanDevice} = $result->{lanDeviceNew};
       foreach ( @{ $result->{lanDevice} } ) {
          $_->{ethernet_port} = $result->{ $_->{_node} }; 
       }
 
-    # Create fields for user-Entries (for fw>=6.69)
+    # Create fields for user-Entries (for fw 6.69)
       $result->{userProfil} = $result->{userProfilNew};
       foreach ( @{ $result->{userProfil} } ) {
          $_->{filter_profile_UID} = $result->{ $_->{_node}."_filter" }; 
@@ -1507,10 +1517,10 @@ sub FRITZBOX_Readout_Run_Web($)
       foreach ( @{ $result->{wlanList} } ) {
          my $mac = $_->{mac};
          $mac =~ s/:/_/g;
-         $wlanList{$mac}{speed} = $_->{speed};
-         $wlanList{$mac}{speed_rx} = $_->{speed_rx};
+         $wlanList{$mac}{speed} .= $_->{speed};
+         $wlanList{$mac}{speed_rx} .= $_->{speed_rx};
          #$wlanList{$mac}{speed_rx} = $result_lan->{$_->{_node}};
-         $wlanList{$mac}{rssi} = $_->{rssi};
+         $wlanList{$mac}{rssi} .= $_->{rssi};
          FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->wlanDevice->".$mac."->speed", $_->{speed};
          FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->wlanDevice->".$mac."->speed_rx", $wlanList{$mac}{speed_rx};
          FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->wlanDevice->".$mac."->rssi", $_->{rssi};
@@ -1536,10 +1546,10 @@ sub FRITZBOX_Readout_Run_Web($)
          $landevice{$dIp}=$dName;
          $landevice{$UID}=$dName;
       # Create a reading if a landevice is connected
-         if ($_->{active} == 1) {
+         if ( $_->{active} ) {
             my $mac = $_->{mac};
             $mac =~ s/:/_/g;
-            if ($_->{ethernet} == 0 && $_->{wlan} == 1) {
+            if ( !$_->{ethernet} && $_->{wlan} ) {
                $dName .= " (";
                $dName .= "g"    if $_->{guest};
                $dName .= "WLAN";
@@ -1547,19 +1557,19 @@ sub FRITZBOX_Readout_Run_Web($)
                       if defined $wlanList{$mac};
                $dName .= ")";
             }
-            if ( $_->{ethernet} == 1 ) {
+            if ( $_->{ethernet_port} ) {
                $dName .= " (";
                $dName .= "g"         if $_->{guest};
                $dName .= "LAN" . $_->{ethernet_port};
                #$dName .= "LAN" . $result_lan->{$_->{_node}};
-               $dName .= ", 1 Gbit/s"    if $_->{speed} == 1000;
-               $dName .= ", " . $_->{speed} . " Mbit/s"   if $_->{speed} != 1000 && $_->{speed} != 0;
+               $dName .= ", 1 Gbit/s"    if $_->{speed} eq "1000";
+               $dName .= ", " . $_->{speed} . " Mbit/s"   if $_->{speed} ne "1000" && $_->{speed} ne "0";
                $dName .= ")";
             }
             my $rName = "mac_".$mac;
             FRITZBOX_Readout_Add_Reading $hash, \@roReadings, $rName, $dName;
-            $wlanCount++      if $_->{wlan} == 1;
-            $gWlanCount++      if $_->{wlan} == 1 && $_->{guest} == 1;
+            $wlanCount++      if $_->{wlan} ;
+            $gWlanCount++      if $_->{wlan}  && $_->{guest} ;
             # Remove mac address from oldLanDevice-List
             delete $oldLanDevice{$rName}   if exists $oldLanDevice{$rName};
          }

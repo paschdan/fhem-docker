@@ -285,6 +285,7 @@
 		<Product type="0005" id="0004" name="Z Thermostat 014G0013" config="danfoss/z.xml"/>
 		<Product type="0064" id="0001" name="RA Plus-W Radiator Thermostat"/>
 		<Product type="0115" id="a010" name="Popp Radiator Thermostat" config="danfoss/z.xml"/>
+                <Product type="0248" id="a010" name="COQON DTHERMZ6" config="danfoss/z.xml" forumNr="no-statistics"/>
 		<Product type="8004" id="2000" name="RXZ3 RF relay Switching Unit"/>
 		<Product type="8005" id="0001" name="Living Connect Radiator Thermostat" config="danfoss/living.xml"/>
 	</Manufacturer>
@@ -506,6 +507,7 @@
 		<Product type="1001" id="1000" name="FGKF601 Keyfob" config="fibaro/fgkf601.xml" />
 		<Product type="1001" id="2000" name="FGKF601 Keyfob" config="fibaro/fgkf601.xml" />
 		<Product type="1201" id="1000" name="FGSD001 CO Sensor" config="fibaro/fgcd001.xml" />
+                <Product type="1301" id="1000" name="FGT001 Heat Controller" config="fibaro/fgt001.xml"/>
 	</Manufacturer>
 	<Manufacturer id="0138" name="First Alert">
 		<Product type="0001" id="0002" name="ZCombo Smoke and Carbon Monoxide Detector"  config="firstalert/zcombo.xml"/>
@@ -537,6 +539,7 @@
 		<Product type="0003" id="0002" name="GR-201N In-Wall Switch"/>
 		<Product type="0003" id="0512" name="GR105n Auto Valve" config="gr/gr105n.xml"/>
 		<Product type="0202" id="0511" name="GR105 Auto Valve" config="gr/gr105.xml"/>
+                <Product type="0500" id="0000" name="Topvico Water Leckage Sensor" forumNr="74705"/>
 		<Product type="0500" id="0001" name="GR-309N Door/Window detector"/>
 	</Manufacturer>
 	<Manufacturer id="0020" name="General Electric">
@@ -771,6 +774,7 @@
 	<Manufacturer id="015f" name="Mcohome">
 		<Product type="0001" id="0001" name="Mini Energy Dimmer"/>
 		<Product type="0002" id="0001" name="Mini Energy Switch"/>
+                <Product type="0702" id="5102" name="MH7 Water/Electrical Heating Thermostat" forumNr="no-statistics"/>
 		<Product type="210a" id="1302" name="MH-P210 Mini Energy Dimmer" config="mcohome/mhp210.xml"/>
 		<Product type="3102" id="0201" name="MH-S311 One-load" config="mcohome/mhs311.xml"/>
 		<Product type="3102" id="0202" name="MH-S312 Two-load" config="mcohome/mhs312.xml"/>
@@ -779,7 +783,7 @@
 		<Product type="4102" id="0202" name="MH-S412 Two-load" config="mcohome/mhs412.xml"/>
 		<Product type="0801" id="3102" name="MH8-FC-EU Thermostat" config="mcohome/mh8fceu.xml"/>
 		<Product type="0802" id="3102" name="MH8-FC4-EU Thermostat" config="mcohome/mh8fceu.xml"/>
-		<Product type="0905" id="0201 " name="MH9-CO2-WD CO2 Monitor" config="mcohome/mh9co2.xml"/>
+		<Product type="0905" id="0201" name="MH9-CO2-WD CO2 Monitor" config="mcohome/mh9co2.xml"/>
 		<Product type="5102" id="0103" name="Touch Panel Switch MH-S513" config="mcohome/mhs513.xml"/>
 	</Manufacturer>
 	<Manufacturer id="007a" name="Merten">
@@ -1023,7 +1027,10 @@
 		<Product type="0001" id="0001" name="STZW402+ Electronic Thermostat" config="stelpro/stzw402.xml"/>
 	</Manufacturer>
 	<Manufacturer id="0271" name="Steinel">
-		<Product type="0001" id="1a73" name="Steinel XLED Home 2" forumNr="no-statistics"/>
+		<Product type="0002" id="1a72" name="IS 140-2" config="steinel/is140-2.xml"/>
+		<Product type="0001" id="1a73" name="XLED Home 2" config="steinel/is140-2.xml"/>
+		<Product type="0001" id="1a74" name="RS LED D2" forumNr="no-statistics"/>
+		<Product type="0001" id="1a75" name="L 810 LED iHF" forumNr="no-statistics"/>
 	</Manufacturer>
 	<Manufacturer id="0166" name="Swiid">
 		<Product type="0100" id="0100" name="SwiidInter" config="swiid/swiidinter.xml"/>

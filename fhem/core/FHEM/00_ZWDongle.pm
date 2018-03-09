@@ -1,5 +1,5 @@
 ##############################################
-# $Id: 00_ZWDongle.pm 15491 2017-11-23 21:47:11Z rudolfkoenig $
+# $Id: 00_ZWDongle.pm 15957 2018-01-22 18:20:41Z rudolfkoenig $
 package main;
 
 use strict;
@@ -145,7 +145,7 @@ ZWDongle_Define($$)
     return undef;
 
   } elsif($dev !~ m/@/ && $dev !~ m/:/) {
-    $def .= "\@115200";  # default baudrate
+    $dev .= "\@115200";  # default baudrate
 
   }
 
@@ -209,7 +209,7 @@ ZWDongle_nlData($)
 
     my %line = (
       pos       => '['.AttrVal($e, "neighborListPos", "").']',
-      class     => '"zwBox"',
+      class     => '"zwBox col_link col_oddrow"',
       neighbors => '['.$nl.']'
     );
 
@@ -229,7 +229,7 @@ ZWDongle_nlData($)
   my $pos = AttrVal($d, "neighborListPos", "");
   my $nl = (@dn ? '"'.join('","',@dn).'"' : '');
   push @ret, "\"$d\":{\"txt\":\"$d\", \"pos\":[$pos],".
-                     "\"class\":\"zwDongle\",\"neighbors\":[$nl] }";
+             "\"class\":\"zwDongle col_oddrow col_link\",\"neighbors\":[$nl] }";
   return "{ \"saveFn\":\"attr {1} neighborListPos {2}\",".
            "\"firstObj\":\"$d\",".
            "\"el\":{".join(",",@ret)."} }";
@@ -569,7 +569,7 @@ ZWDongle_Get($@)
     my $maxlen = (length($msg) >= 10 ? 10 : length($msg));
     for(my $off=4; $off<$maxlen; $off+=2) {
         my $dec = hex(substr($msg, $off, 2));
-        if($dec == 127 || $dec == 0) {
+        if($dec == 127) {
           push @list, ("ch".($i+1).":N/A");
         } elsif($dec == 126) {
           push @list, ("ch".($i+1).":aboveMaxPower");

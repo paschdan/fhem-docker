@@ -9,11 +9,16 @@
 
 function depends_checkbox() {
     var deps = [];
+
+    if (!$('link[href$="lib/switchery.min.css"]').length) {
+        deps.push(ftui.config.basedir + "lib/switchery.min.css");
+    }
+
     if (!$.fn.Switchery) {
-        $('head').append('<link rel="stylesheet" href="' + ftui.config.basedir + 'lib/switchery.min.css" type="text/css" />');
         deps.push(ftui.config.basedir + "lib/switchery.min.js");
     }
-    if (typeof Module_famultibutton == 'undefined' || !$.fn.famultibutton) {
+
+    if (typeof window["Modul_famultibutton"] === 'undefined' || !$.fn.famultibutton) {
         deps.push('famultibutton');
     }
     return deps;
@@ -29,9 +34,10 @@ var Modul_checkbox = function () {
 
     function init() {
 
-        me.elements = $('div[data-type="' + me.widgetname + '"]', me.area);
+        me.elements = $('div[data-type="' + me.widgetname + '"]:not([data-ready])', me.area);
         me.elements.each(function (index) {
             var elem = $(this);
+            elem.attr("data-ready", "");
             elem.data('off-color', elem.data('off-color') || ftui.getStyle('.checkbox.off', 'color') || '#bfbfbf');
             elem.data('off-background-color', elem.data('off-background-color') || ftui.getStyle('.checkbox.off', 'background-color') || '#505050');
             elem.data('on-color', elem.data('on-color') || ftui.getStyle('.checkbox.on', 'color') || '#bfbfbf');

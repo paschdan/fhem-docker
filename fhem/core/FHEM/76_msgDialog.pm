@@ -1,5 +1,5 @@
 # Id ##########################################################################
-# $Id: 76_msgDialog.pm 15381 2017-11-03 04:40:00Z igami $
+# $Id: 76_msgDialog.pm 15678 2017-12-24 06:31:42Z igami $
 
 # copyright ###################################################################
 #
@@ -355,7 +355,7 @@ sub msgDialog_progress($$$;$) {
     ;
 
     foreach (@commands){
-      $_ =~ s/;/;;/g;
+      $_ =~ s/;/;;/g if($_ =~ m/^{.*}$/s);
       my $ret = AnalyzeCommandChain(undef, $_);
 
       Log3($SELF, 4, "$TYPE ($SELF) - return from command \"$_\": $ret")

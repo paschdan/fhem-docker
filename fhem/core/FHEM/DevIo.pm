@@ -1,5 +1,5 @@
 ##############################################
-# $Id: DevIo.pm 14933 2017-08-20 14:21:58Z rudolfkoenig $
+# $Id: DevIo.pm 15939 2018-01-20 17:17:19Z rudolfkoenig $
 package main;
 
 sub DevIo_CloseDev($@);
@@ -500,6 +500,8 @@ DevIo_CloseDev($@)
   delete($readyfnlist{"$name.$dev"});
   delete($hash->{FD});
   delete($hash->{EXCEPT_FD});
+  delete($hash->{PARTIAL});
+  delete($hash->{NEXT_OPEN});
 }
 
 sub

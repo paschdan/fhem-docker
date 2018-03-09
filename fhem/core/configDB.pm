@@ -1,4 +1,4 @@
-# $Id: configDB.pm 15096 2017-09-19 12:55:19Z betateilchen $
+# $Id: configDB.pm 16235 2018-02-20 21:53:26Z betateilchen $
 
 =for comment
 
@@ -126,6 +126,9 @@
 #
 # 2017-08-31 - changed   improve table_info for migration check
 #
+# 2018-02-17 - changed   remove experimenatal cache functions
+# 2018-02-18 - changed   move dump processing to backend
+#
 ##############################################################################
 =cut
 
@@ -170,7 +173,7 @@ sub _cfgDB_Execute($@);
 sub _cfgDB_Filedelete($);
 sub _cfgDB_Fileexport($;$);
 sub _cfgDB_Filelist(;$);
-sub _cfgDB_Info();
+sub _cfgDB_Info($);
 sub _cfgDB_Migrate();
 sub _cfgDB_ReadCfg(@);
 sub _cfgDB_ReadState(@);
@@ -180,6 +183,7 @@ sub _cfgDB_Rotate($$);
 sub _cfgDB_Search($$;$);
 sub _cfgDB_Uuid();
 sub _cfgDB_table_exists($$);
+sub _cfgDB_dump($);
 
 ##################################################
 # Read configuration file for DB connection
@@ -395,10 +399,10 @@ sub cfgDB_AttrRead($) {
 sub cfgDB_FileRead($) {
 	my ($filename) = @_;
 
-    if ($configDB{cache}{$filename} && $configDB{attr}{useCache}) {
-      Log3(undef, 4, "configDB serving from cache: $filename");
-      return (undef,split(/\n/,$configDB{cache}{$filename}));
-    }
+#    if ($configDB{cache}{$filename} && $configDB{attr}{useCache}) {
+#      Log3(undef, 4, "configDB serving from cache: $filename");
+#      return (undef,split(/\n/,$configDB{cache}{$filename}));
+#    }
 
 	Log3(undef, 4, "configDB reading file: $filename");
 	my ($err, @ret, $counter);
@@ -411,10 +415,10 @@ sub cfgDB_FileRead($) {
 	$blobContent = decode_base64($blobContent) if ($blobContent);
 	$counter = length($blobContent);
 	if($counter) {
-	    if ($configDB{attr}{useCache}) {
-           Log3(undef,4,"configDB caching: $filename");
-           $configDB{cache}{$filename} = $blobContent;
-        }
+#	    if ($configDB{attr}{useCache}) {
+#           Log3(undef,4,"configDB caching: $filename");
+#           $configDB{cache}{$filename} = $blobContent;
+#        }
 		@ret = split(/\n/,$blobContent);
 		$err = "";
 	} else {
@@ -425,10 +429,10 @@ sub cfgDB_FileRead($) {
 }
 sub cfgDB_FileWrite($@) {
 	my ($filename,@content) = @_;
-    if ($configDB{attr}{useCache}) {
-       Log3(undef,4,"configDB delete from cache: $filename");
-       $configDB{cache}{$filename} = undef;
-    }
+#    if ($configDB{attr}{useCache}) {
+#       Log3(undef,4,"configDB delete from cache: $filename");
+#       $configDB{cache}{$filename} = undef;
+#    }
 	Log3(undef, 4, "configDB writing file: $filename");
 	my $fhem_dbh = _cfgDB_Connect;
 	$fhem_dbh->do("delete from fhemb64filesave where filename = '$filename'");
@@ -575,6 +579,7 @@ sub cfgDB_SaveState() {
 		if(defined($val) &&
 			$val ne "unknown" &&
 			$val ne "Initialized" &&
+			$val ne "" &&
 			$val ne "???") {
 			$val =~ s/;/;;/g;
 			$val =~ s/\n/\\\n/g;
@@ -705,7 +710,7 @@ sub cfgDB_MigrationImport() {
 
 # return SVN Id, called by fhem's CommandVersion
 sub cfgDB_svnId() { 
-	return "# ".'$Id: configDB.pm 15096 2017-09-19 12:55:19Z betateilchen $' 
+	return "# ".'$Id: configDB.pm 16235 2018-02-20 21:53:26Z betateilchen $' 
 }
 
 # return filelist depending on directory and regexp
@@ -897,19 +902,25 @@ sub _cfgDB_Migrate() {
 	$ret .= cfgDB_MigrationImport;
 	$ret .= "Migration completed\n\n";
 	Log3('configDB',4,'Migration completed.');
-	$ret .= _cfgDB_Info;
+	$ret .= _cfgDB_Info(undef);
 	return $ret;
 }
 
 # show database statistics
-sub _cfgDB_Info() {
+sub _cfgDB_Info($) {
+	my ($info2) = @_;
+	$info2 //= 'unknown';
+Debug ">$info2<";
 	my ($l, @r, $f);
 	for my $i (1..65){ $l .= '-';}
 
 	push @r, $l;
 	push @r, " configDB Database Information";
 	push @r, $l;
-	push @r, " ".cfgDB_svnId;
+	my $info1 = cfgDB_svnId;
+	$info1 =~ s/# //;
+	push @r, " d:$info1";
+	push @r, " c:$info2";
 	push @r, $l;
 	push @r, " dbconn: $cfgDB_dbconn";
 	push @r, " dbuser: $cfgDB_dbuser" if !$configDB{attr}{private};
@@ -1033,7 +1044,7 @@ sub _cfgDB_Reorg(;$$) {
 	$fhem_dbh->disconnect();
 	eval qx(sqlite3 $cfgDB_filename vacuum) if($cfgDB_dbtype eq "SQLITE");
 	return if(defined($quiet));
-	return " Result after database reorg:\n"._cfgDB_Info;
+	return " Result after database reorg:\n"._cfgDB_Info(undef);
 }
 
 # delete temporary version
@@ -1140,6 +1151,68 @@ sub _cfgDB_findDef($;$) {
 
 sub _cfgDB_type() { 
    return "$cfgDB_dbtype (b64)";
+}
+
+sub _cfgDB_dump($) {
+   my ($param1) = @_;
+   $param1 //= '';
+
+   my ($dbconn,$dbuser,$dbpass,$dbtype)  = _cfgDB_readConfig();
+   my ($dbname,$dbhostname,$dbport,$gzip,$mp,$ret,$size,$source,$target,$ts);
+   $ts     = strftime('%Y-%m-%d_%H-%M-%S',localtime);
+   $mp     = $configDB{attr}{'dumpPath'};
+   $mp   //= AttrVal('global','modpath','.').'/log';
+   $target = "$mp/configDB_$ts.dump";
+
+   if (lc($param1) eq 'unzipped') {
+      $gzip = '';
+   } else {
+      $gzip    = '| gzip -c';
+      $target .= '.gz';
+   }
+
+   if ($dbtype eq 'SQLITE') {
+      (undef,$source) = split (/=/, $dbconn);
+      my $dumpcmd = "echo '.dump fhem%' | sqlite3 $source $gzip > $target";
+      Log 4,"configDB: $dumpcmd";
+      $ret        = qx($dumpcmd);
+      return $ret if $ret; # return error message if available
+
+   } elsif ($dbtype eq 'MYSQL') {
+      ($dbname,$dbhostname,$dbport) = split (/;/,$dbconn);
+      $dbport //= '=3306';
+      (undef,$dbname)     = split (/=/,$dbname);
+      (undef,$dbhostname) = split (/=/,$dbhostname);
+      (undef,$dbport)     = split (/=/,$dbport);
+      my $dbtables = "fhemversions fhemconfig fhemstate fhemb64filesave";
+      my $dumpcmd = "mysqldump --user=$dbuser --password=$dbpass --host=$dbhostname --port=$dbport -Q $dbname $dbtables $gzip > $target";
+      Log 4,"configDB: $dumpcmd";
+      $ret        = qx($dumpcmd);
+      return $ret if $ret;
+      $source = $dbname;
+
+   } elsif ($dbtype eq 'POSTGRESQL') {
+      ($dbname,$dbhostname,$dbport) = split (/;/,$dbconn);
+      $dbport //= '=5432';
+      (undef,$dbname)     = split (/=/,$dbname);
+      (undef,$dbhostname) = split (/=/,$dbhostname);
+      (undef,$dbport)     = split (/=/,$dbport);
+      my $dbtables = "-t fhemversions -t fhemconfig -t fhemstate -t fhemb64filesave";
+      my $dumpcmd = "PGPASSWORD=$dbpass pg_dump -U $dbuser -h $dbhostname -p $dbport $dbname $dbtables $gzip > $target";
+      Log 4,"configDB: $dumpcmd";
+      $ret        = qx($dumpcmd);
+      return $ret if $ret;
+      $source     = $dbname;
+
+   } else {
+      return "configdb dump not supported for $dbtype!";
+   }
+
+   $size = -s $target;
+   $size //= 0;
+   $ret  = "configDB dumped $size bytes\nfrom: $source\n  to: $target";
+   return $ret;
+
 }
 
 ##################################################

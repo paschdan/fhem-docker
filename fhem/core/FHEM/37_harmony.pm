@@ -1,5 +1,5 @@
 
-# $Id: 37_harmony.pm 15393 2017-11-05 11:06:17Z justme1968 $
+# $Id: 37_harmony.pm 15971 2018-01-23 13:41:25Z justme1968 $
 
 package main;
 
@@ -1019,6 +1019,7 @@ harmony_Read($)
             if( defined($decoded->{sleepTimerId}) ) {
               if( $decoded->{sleepTimerId} == -1 ) {
                 delete $hash->{sleeptimer};
+                DoTrigger( $name, "sleeptimer: expired" );
               } else {
                 harmony_sendEngineGet($hash, "gettimerinterval", "timerId=$decoded->{sleepTimerId}");
               }
@@ -1104,6 +1105,7 @@ harmony_Read($)
 
           } elsif( $content =~ m/engine\?gettimerinterval/ && $decoded ) {
             $hash->{sleeptimer} = FmtDateTime( gettimeofday() + $decoded->{interval} );
+            DoTrigger( $name, "sleeptimer: $hash->{sleeptimer}" );
 
           } elsif( $content =~ m/firmware\?/ && $decoded ) {
             Log3 $name, 4, "$name: firmware: $cdata";

@@ -1,4 +1,4 @@
-# $Id: 55_InfoPanel.pm 14101 2017-04-25 10:19:12Z betateilchen $
+# $Id: 55_InfoPanel.pm 15708 2017-12-27 15:01:42Z betateilchen $
 
 =for comment
 ##############################################
@@ -260,8 +260,15 @@ sub btIP_readLayout {
 
   my ($err, @layoutfile) = FileRead($filename);
   if($err) {
+#    Log 1, "InfoPanel $name: $err";
+#    $hash->{fhem}{layout} = "text ERROR 50 50 \"Error on reading layout!\"";
     Log 1, "InfoPanel $name: $err";
     $hash->{fhem}{layout} = "text ERROR 50 50 \"Error on reading layout!\"";
+    my ($e,@layout) = FileRead('./FHEM/template.layout');
+    unless ($e){
+       FileWrite($filename,@layout);
+       $hash->{fhem}{layout} = "text ERROR 50 50 \"Please edit layoutfile now.\"";
+    }
   } else {
     $hash->{fhem}{layout} = join("\n", @layoutfile);
     while($hash->{fhem}{layout} =~ m/\@include/ && $level < 1000) {

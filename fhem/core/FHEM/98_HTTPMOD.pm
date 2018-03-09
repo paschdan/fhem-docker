@@ -1,5 +1,5 @@
 #########################################################################
-# $Id: 98_HTTPMOD.pm 15035 2017-09-09 12:02:21Z StefanStrobel $
+# $Id: 98_HTTPMOD.pm 16216 2018-02-18 15:26:11Z StefanStrobel $
 # fhem Modul für Geräte mit Web-Oberfläche / Webservices
 #   
 #     This file is part of fhem.
@@ -145,6 +145,9 @@
 #               fixed a warning when alwaysNum without NumLen is specified
 #   2017-09-06  new attribute reAuthAlways to do the defined authentication steps 
 #               before each get / set / getupdate regardless of any reAuthRegex setting or similar.
+#   2018-01-18  added preProcessRegex e.g. to fix broken JSON data in a response
+#   2018-02-10  modify handling of attribute removeBuf since httpUtils doesn't expose its buffer anymore, 
+#               Instead new attribute showBody to explicitely show a formatted version of the http response body (header is already shown)
 #
 
 #
@@ -210,7 +213,7 @@ sub HTTPMOD_AddToQueue($$$$$;$$$$);
 sub HTTPMOD_JsonFlatter($$;$);
 sub HTTPMOD_ExtractReading($$$$$);
 
-my $HTTPMOD_Version = '3.4.0 - 9.9.2017';
+my $HTTPMOD_Version = '3.4.2 - 10.2.2018';
 
 #
 # FHEM module intitialisation
@@ -273,7 +276,9 @@ sub HTTPMOD_Initialize($)
 
       "showMatched:0,1 " .
       "showError:0,1 " .
-      "removeBuf:0,1 " .
+      "showBody " .                     # expose the http response body as internal
+      #"removeBuf:0,1 " .               # httpUtils doesn't expose buf anymore
+      "preProcessRegex " .
       
       "parseFunction1 " .
       "parseFunction2 " .
@@ -2176,7 +2181,7 @@ sub HTTPMOD_GetCookies($$)
 sub HTTPMOD_InitParsers($$)
 {
     my ($hash, $body) = @_;
-    my $name    = $hash->{NAME};
+    my $name = $hash->{NAME};
 
     # initialize parsers
     if ($hash->{JSONEnabled} && $body) {
@@ -2423,10 +2428,26 @@ sub HTTPMOD_Read($$$)
          ($body ? ",\r\nBody: $body" : ", body empty");
     
     $body = "" if (!$body);
+    
+    my $ppr = AttrVal($name, "preProcessRegex", "");
+    if ($ppr) {
+            my $pprexp = '$body=~' . $ppr; 
+            my $oldSig = ($SIG{__WARN__} ? $SIG{__WARN__} : 'DEFAULT');
+            $SIG{__WARN__} = sub { Log3 $name, 3, "$name: read applying preProcessRegex created warning: @_"; };
+            eval $pprexp;
+            $SIG{__WARN__} = $oldSig;
+    
+        $body =~ $ppr;
+        Log3 $name, 5, "$name: Read - body after preProcessRegex: $ppr is $body";
+    }
+    
     $buffer = ($header ? $header . "\r\n\r\n" . $body : $body);      # for matching sid / reauth
     $buffer = $buffer . "\r\n\r\n" . $err if ($err);                 # for matching reauth
     
-    delete $hash->{buf} if (AttrVal($name, "removeBuf", 0));
+    #delete $hash->{buf} if (AttrVal($name, "removeBuf", 0));
+    if (AttrVal($name, "showBody", 0)) {
+        $hash->{httpbody} = $body;
+    }
     
     HTTPMOD_InitParsers($hash, $body);   
     HTTPMOD_GetCookies($hash, $header) if (AttrVal($name, "enableCookies", 0));   
@@ -2447,7 +2468,7 @@ sub HTTPMOD_Read($$$)
         HTTPMOD_CleanupParsers($hash);
         return undef;   # don't continue parsing response  
     }
-  
+      
     my ($checkAll, $tried, $match, $reading); 
     my @unmatched = (); my @matched   = ();
     
@@ -3504,8 +3525,7 @@ HTTPMOD_AddToQueue($$$$$;$$$$){
         <li><b>get|reading[0-9]*DeleteOnError</b></li>
             If set to 1 this attribute causes certain readings to be deleted when the website can not be reached and the HTTP request returns an error. Internally HTTPMOD remembers which kind of operation created a reading (update, Get01, Get02 and so on). Specified readings will only be deleted if the same operation returns an error. <br>
             The same restrictions as for DeleteIfUnmatched apply regarding a fhem restart.
-        <br>
-        
+        <br>        
 
         <li><b>httpVersion</b></li>
             defines the HTTP-Version to be sent to the server. This defaults to 1.0.
@@ -3531,8 +3551,10 @@ HTTPMOD_AddToQueue($$$$$;$$$$){
             if set to 1 then HTTPMOD will create a reading and event with the Name LAST_ERROR 
             that contains the error message of the last error returned from HttpUtils. 
         <li><b>removeBuf</b></li>
-            if set to 1 then HTTPMOD removes the internal named buf when a HTTP-response has been
-            received. $hash->{buf} is used internally be Fhem httpUtils and in some use cases it is desireable to remove this internal after reception because it contains a very long response which looks ugly in Fhemweb.
+            This attribute has been removed. If set to 1 then HTTPMOD used to removes the internal named buf when a HTTP-response had been
+            received. $hash->{buf} is used internally be Fhem httpUtils and used to be visible. This behavior of httpUtils has changed so removeBuf has become obsolete.
+        <li><b>showBody</b></li>
+            if set to 1 then the body of http responses will be visible as internal httpbody.
             
         <li><b>timeout</b></li>
             time in seconds to wait for an answer. Default value is 2
@@ -3554,6 +3576,8 @@ HTTPMOD_AddToQueue($$$$$;$$$$){
         <li><b>parseFunction1</b> and <b>parseFunction2</b></li>
             These functions allow an experienced Perl / Fhem developer to plug in his own parsing functions.<br>
             Please look into the module source to see how it works and don't use them if you are not sure what you are doing.
+        <li><b>preProcessRegex</b></li>
+            can be used to fix a broken HTTP response before parsing. The regex should be a replacement regex like s/match/replacement/g and will be applied to the buffer.
 
         <li><b>Remarks regarding the automatically created userattr entries</b></li>
             Fhemweb allows attributes to be edited by clicking on them. However this does not work for attributes that match to a wildcard attribute. To circumvent this restriction HTTPMOD automatically adds an entry for each instance of a defined wildcard attribute to the device userattr list. E.g. if you define a reading[0-9]Name attribute as reading01Name, HTTPMOD will add reading01Name to the device userattr list. These entries only have the purpose of making editing in Fhemweb easier.

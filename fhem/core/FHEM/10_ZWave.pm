@@ -1,5 +1,5 @@
 ##############################################
-# $Id: 10_ZWave.pm 15445 2017-11-18 10:29:25Z rudolfkoenig $
+# $Id: 10_ZWave.pm 16151 2018-02-11 15:05:53Z rudolfkoenig $
 # See ZWDongle.pm for inspiration
 package main;
 
@@ -5142,7 +5142,7 @@ ZWave_fhemwebFn($$$$)
   my $iodev = $defs{$d}{IODev}{NAME};
   my $hs = AttrVal($iodev, "helpSites", $zwave_activeHelpSites);
   for my $n (split(",", $hs)) {
-    my $link = $zwave_link{$n}{$model};
+    my $link = $zwave_link{$n}{lc($model)};
     next if(!$link);
     $pl .= "<div class='detLink ZWPepper'>";
     my $url = ($n eq "alliance" ?
@@ -5152,7 +5152,7 @@ ZWave_fhemwebFn($$$$)
     $pl .= "</div>";
   }
 
-  my $img = ZWave_getPic($iodev, $model);
+  my $img = ZWave_getPic($iodev, lc($model));
   if($img && !$FW_ss) {
     $pl .= "<div class='img'".($FW_tp?"":" style='float:right'").">";
     $pl .= "<img style='max-width:96;max-height:96px;' src='$img'>";
@@ -5162,7 +5162,7 @@ ZWave_fhemwebFn($$$$)
   return
   "<div id='ZWHelp' class='makeTable help'></div>$pl".
   '<script type="text/javascript">'.
-   "var d='$d', FW_tp='$FW_tp';" . <<'JSEND'
+   "var zwaveDevice='$d', FW_tp='$FW_tp';" . <<'JSEND'
     $(document).ready(function() {
       $("div#ZWHelp").insertBefore("div.makeTable.internals"); // Move
       $("div.detLink.ZWPepper").insertAfter("div.detLink.devSpecHelp");
@@ -5172,7 +5172,7 @@ ZWave_fhemwebFn($$$$)
           $("div#ZWHelp").html(val);
         }
         $(this).change(function(){
-          FW_queryValue('{ZWave_helpFn("'+d+'","'+$(this).val()+'")}',
+          FW_queryValue('{ZWave_helpFn("'+zwaveDevice+'","'+$(this).val()+'")}',
                         $(this).get(0));
         });
       });

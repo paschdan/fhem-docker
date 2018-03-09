@@ -1,5 +1,5 @@
 "use strict";
-// $Id: fhemdoc_modular.js 13576 2017-03-02 09:43:52Z rudolfkoenig $
+// $Id: fhemdoc_modular.js 16015 2018-01-27 21:30:01Z rudolfkoenig $
 
 var fd_loadedHash={}, fd_loadedList=[], fd_all={}, fd_allCnt, fd_progress=0, 
     fd_lang, fd_offsets=[], fd_scrolled=0, fd_modLinks={}, csrfToken="X";
@@ -207,6 +207,10 @@ $(document).ready(function(){
 
   if(location.hash)
     loadOneDoc(location.hash.substr(1), fd_lang);
+
+  $(window).bind('hashchange', function() {
+    loadOneDoc(location.hash.substr(1), fd_lang);
+  });
 
   $("a[name=loadAll]").show().click(function(e){
     e.preventDefault();

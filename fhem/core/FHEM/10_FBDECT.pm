@@ -1,7 +1,8 @@
 ##############################################
-# $Id: 10_FBDECT.pm 15295 2017-10-20 07:03:57Z rudolfkoenig $
+# $Id: 10_FBDECT.pm 15670 2017-12-22 22:03:42Z rudolfkoenig $
 package main;
 
+# See also https://avm.de/fileadmin/user_upload/Global/Service/Schnittstellen/AHA-HTTP-Interface.pdf
 use strict;
 use warnings;
 use SetExtensions;
@@ -13,7 +14,7 @@ sub FBDECT_Cmd($$@);
 
 sub FBDECT_decodePayload($$$);
 
-my @fbdect_models = qw(Powerline546E Dect200 CometDECT);
+my @fbdect_models = qw(Powerline546E Dect200 CometDECT HAN-FUN);
 
 my %fbdect_payload = (
    7 => { n=>"connected" },
@@ -176,9 +177,12 @@ FBDECT_Get($@)
   my $cmd = ($a[1] ? $a[1] : "");
   my %gets = ("devInfo"=>1);
 
-  my $cmdList = ($hash->{IODev} && $hash->{IODev}{TYPE} eq "FBAHA") ? 
-                  join(" ", sort keys %gets) : "";
-  return "Unknown argument $cmd, choose one of $cmdList" if(!$gets{$cmd});
+  if($hash->{IODev} && $hash->{IODev}{TYPE} eq "FBAHA") {
+    return "Unknown argument $cmd, choose one of ".join(" ",sort keys %gets)
+        if(!$gets{$cmd});
+  } else {
+    return "Unknown argument $cmd, choose one of ";
+  }
 
   if($cmd eq "devInfo") {
     my @answ = FBAHA_getDevList($hash->{IODev}, $hash->{id});
@@ -245,8 +249,12 @@ FBDECT_ParseHttp($$$)
   my $ain = $h{identifier};
   $ain =~ s/[-: ]/_/g;
 
-  my %ll = (6=>"actuator", 7=>"powerMeter", 8=>"tempSensor",
-            9=>"switch", 10=>"repeater");
+  my %ll = (4=>"alarmSensor",
+            6=>"actuator",
+            7=>"powerMeter",
+            8=>"tempSensor",
+            9=>"switch",
+           10=>"repeater");
   my $lsn = int($h{functionbitmask});
   my @fb;
   map { push @fb, $ll{$_} if((1<<$_) & $lsn) } sort keys %ll;

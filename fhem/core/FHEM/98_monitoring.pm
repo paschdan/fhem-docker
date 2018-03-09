@@ -1,5 +1,5 @@
 # Id ##########################################################################
-# $Id: 98_monitoring.pm 15160 2017-10-01 10:17:12Z igami $
+# $Id: 98_monitoring.pm 15575 2017-12-09 08:08:00Z igami $
 
 # copyright ###################################################################
 #
@@ -398,6 +398,7 @@ sub monitoring_Notify($$) {
 }
 
 # module Fn ###################################################################
+# stateFormat #################################################################
 sub monitoring_modify($) {
   my ($SELF, $list, $operation, $value, $wait) = split("\\|", shift);
   my ($hash) = $defs{$SELF};
@@ -565,7 +566,7 @@ sub monitoring_setActive($) {
     <b>Define</b>
     <ul>
       <code>
-        define &lt;name&gt; &lt;add-event&gt; [&lt;remove-event&gt;]
+        define &lt;name&gt; monitoring  &lt;add-event&gt; [&lt;remove-event&gt;]
       </code>
       <br>
       The syntax for &lt;add-event&gt; and &lt;remove-event&gt; is the
@@ -1026,7 +1027,7 @@ attr BeamerFilter_monitoring warningFuncRemove {return}</pre>
     <b>Define</b>
     <ul>
       <code>
-        define &lt;name&gt; &lt;add-event&gt; [&lt;remove-event&gt;]
+        define &lt;name&gt; mointoring &lt;add-event&gt; [&lt;remove-event&gt;]
       </code>
       <br>
       Die Syntax f&uuml;r &lt;add-event&gt; und &lt;remove-event&gt; ist die

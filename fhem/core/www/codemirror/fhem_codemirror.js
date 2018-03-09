@@ -1,4 +1,4 @@
-/* $Id: fhem_codemirror.js 11619 2016-06-05 14:41:13Z rapster $ */
+/* $Id: fhem_codemirror.js 15695 2017-12-26 13:47:50Z rudolfkoenig $ */
 
 var cm_loaded = 0;
 var cm_active = 0;
@@ -57,6 +57,16 @@ var cm_attr = {
 };
 
 function AddCodeMirror(e, cb) {
+    if(e instanceof jQuery) {
+	AddCodeMirror(e.get(0), cb);
+	return;
+    }
+
+    if(e == undefined || e.editor) {
+	return;
+    }
+    e.editor = true;
+
     if(cm_active && cm_loaded == cm_active)
         return cm_wait(e, cb);
         

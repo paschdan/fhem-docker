@@ -1,5 +1,5 @@
 ##############################################
-# $Id: 98_HMinfo.pm 15458 2017-11-19 18:20:37Z martinp876 $
+# $Id: 98_HMinfo.pm 16225 2018-02-19 19:23:47Z martinp876 $
 package main;
 use strict;
 use warnings;
@@ -226,13 +226,19 @@ sub HMinfo_status($){##########################################################
   #--- used for error counts
   my @erro = split ",",$attr{$name}{sumERROR};
   
+  # clearout internals prior to update
+  delete $hash->{$_} foreach (grep(/^(ERR|W_|I_|C_|CRI_)/,keys%{$hash}));
+
   my %errFlt;
+  my %errFltN;
   my %err;
-  my @errNames;
+
   foreach (@erro){    #prepare reading filter for error counts
     my ($p,@a) = split ":",$_;
     $errFlt{$p}{x}=1; # add at least one reading
     $errFlt{$p}{$_}=1 foreach (@a);
+    my @b;
+    $errFltN{$p} = \@b;# will need an array to collect the relevant names
   }
   #--- used for IO, protocol  and communication (e.g. rssi)
   my @IOdev;
@@ -267,9 +273,9 @@ sub HMinfo_status($){##########################################################
     foreach my $read (grep {$ehash->{READINGS}{$_}} keys %errFlt){#---- count error readings
       my $val = $ehash->{READINGS}{$read}{VAL};
       next if (grep (/$val/,(keys%{$errFlt{$read}})));# filter non-Error
-      $err{$read}{$val} =0 if (!$err{$read}{$val});
+      push @{$errFltN{$read}},$eName;
+      $err{$read}{$val} = 0 if (!$err{$read}{$val});
       $err{$read}{$val}++;
-      push @errNames,$eName;
     }
     if ($ehash->{helper}{role}{dev}){#---restrict to devices
       $nbrD++;
@@ -303,7 +309,7 @@ sub HMinfo_status($){##########################################################
   foreach my $read(keys %errFlt) {
     if (defined $err{$read}) {
       my $d;
-      $d .= "$_:$err{$read}{$_},"foreach(keys %{$err{$read}});
+      $d .= "$_:$err{$read}{$_}," foreach(keys %{$err{$read}});
       push @updates,"ERR_$read:".$d;
     } 
     elsif (defined $hash->{READINGS}{"ERR_$read"}) {
@@ -316,17 +322,16 @@ sub HMinfo_status($){##########################################################
         delete $hash->{READINGS}{"ERR_$read"};	
       }
     }
-   }
-
-  @errNames = grep !/^$/,HMinfo_noDup(@errNames);
-  $hash->{ERR_names} = join",",@errNames if(@errNames);# and name entities
+  }
+  foreach(keys %errFltN){
+    next if (!@{$errFltN{$_}});
+    $hash->{"ERR_".$_} = join(",",sort @{$errFltN{$_}});
+  }
 
   push @updates,"C_sumDefined:"."entities:$nbrE,device:$nbrD,channel:$nbrC,virtual:$nbrV";
   # ------- display status of action detector ------
   push @updates,"I_actTotal:".join",",(split" ",$modules{CUL_HM}{defptr}{"000000"}{STATE});
-  if (@Anames){$hash->{ERRactNames} = join",",@Anames}
-  else{ delete $hash->{ERRactNames}};
-
+  
   # ------- what about IO devices??? ------
   push @IOdev,split ",",AttrVal($_,"IOList","")foreach (keys %IOccu);
 
@@ -342,21 +347,13 @@ sub HMinfo_status($){##########################################################
   # Current Events are Rcv,NACK,IOerr,Resend,ResendFail,Snd
   # additional variables are protCmdDel,protCmdPend,protState,protLastRcv
 
-  push @updates,"CRIT__protocol:"  .join(",",map {"$_:$protC{$_}"} grep {$protC{$_}} sort keys(%protC));
-  push @updates,"ERR__protocol:"   .join(",",map {"$_:$protE{$_}"} grep {$protE{$_}} sort keys(%protE));
-  push @updates,"W__protocol:"     .join(",",map {"$_:$protW{$_}"} grep {$protW{$_}} sort keys(%protW));
+  push @updates,"CRI__protocol:"  .join(",",map {"$_:$protC{$_}"} grep {$protC{$_}} sort keys(%protC));
+  push @updates,"ERR__protocol:"  .join(",",map {"$_:$protE{$_}"} grep {$protE{$_}} sort keys(%protE));
+  push @updates,"W__protocol:"    .join(",",map {"$_:$protW{$_}"} grep {$protW{$_}} sort keys(%protW));
 
   my @tpu = devspec2array("TYPE=CUL_HM:FILTER=state=unreachable");
   push @updates,"ERR__unreachable:".scalar(@tpu);
   push @updates,"I_autoReadPend:". scalar @{$modules{CUL_HM}{helper}{qReqConf}};
-
-  $hash->{W__unreachNames} = join(",",@tpu);
-  $hash->{CRI__protoNames} = join(",",grep !/^$/,HMinfo_noDup(@protNamesC));
-  $hash->{ERR__protoNames} = join(",",grep !/^$/,HMinfo_noDup(@protNamesE));
-  $hash->{W__protoNames}   = join(",",grep !/^$/,HMinfo_noDup(@protNamesW));
-  $hash->{I_autoReadPend}  = join(",",@{$modules{CUL_HM}{helper}{qReqConf}});
-  $hash->{W_unConfRegs}    = join(",",@shdwNames);
-  
   # ------- what about rssi low readings ------
   foreach (grep {$rssiMin{$_} != 0}keys %rssiMin){
     if    ($rssiMin{$_}> -60) {$rssiMinCnt{"59<"}++;}
@@ -366,28 +363,39 @@ sub HMinfo_status($){##########################################################
     else                      {$rssiMinCnt{"80>"}++;}
   }
 
-  my $d ="";
-  $d .= "$_:$rssiMinCnt{$_} " foreach (sort keys %rssiMinCnt);
-  push @updates,"I_rssiMinLevel:".$d;
-  $hash->{ERR___rssiCrit} = join(",",@rssiNames);
+  my @ta;
+                                              if(@tpu)      {$hash->{W__unreachNames} = join(",",@tpu)      };
+  @ta = grep !/^$/,HMinfo_noDup(@protNamesC); if(@ta)       {$hash->{CRI__protocol}   = join(",",@ta)       };
+  @ta = grep !/^$/,HMinfo_noDup(@protNamesE); if(@ta)       {$hash->{ERR__protocol}   = join(",",@ta)       };
+  @ta = grep !/^$/,HMinfo_noDup(@protNamesW); if(@ta)       {$hash->{W__protoNames}   = join(",",@ta)       };
+  @ta = @{$modules{CUL_HM}{helper}{qReqConf}};if(@ta)       {$hash->{I_autoReadPend}  = join(",",@ta)       };
+                                              if(@shdwNames){$hash->{W_unConfRegs}    = join(",",@shdwNames)};
+                                              if(@rssiNames){$hash->{ERR___rssiCrit}  = join(",",@rssiNames)};
+                                              if(@Anames)   {$hash->{ERR__actDead}    = join(",",@Anames)   };
+ 
+  push @updates,"I_rssiMinLevel:".join(" ",map {"$_:$rssiMinCnt{$_}"} sort keys %rssiMinCnt);
+  
   # ------- update own status ------
   $hash->{STATE} = "updated:".TimeNow();
-  
-  foreach (grep(/^(ERR|W_|I_|C_|CRI_)/,keys%{$hash})){# remove empty entries
-    delete $hash->{$_} if(!$hash->{$_});
-#    delete $hash->{READINGS}{$_};
-  }
-  
+    
+  # ------- update own status ------
+  my %curRead;
+  $curRead{$_}++ for(grep /^(ERR|W_|I_|C_|CRI_)/,keys%{$hash->{READINGS}});
+
   readingsBeginUpdate($hash);
   foreach my $rd (@updates){
     next if (!$rd);
     my ($rdName, $rdVal) = split(":",$rd, 2);
+    delete $curRead{$rdName};
     next if (defined $hash->{READINGS}{$rdName} &&
              $hash->{READINGS}{$rdName}{VAL} eq $rdVal);
     readingsBulkUpdate($hash,$rdName,
                              ((defined($rdVal) && $rdVal ne "")?$rdVal:"-"));
   }
   readingsEndUpdate($hash,1);
+
+  delete $hash->{READINGS}{$_} foreach(keys %curRead);
+  
   return;
 }
 sub HMinfo_autoUpdate($){#in:name, send status-request#########################
@@ -644,7 +652,6 @@ sub HMinfo_paramCheck(@) { ####################################################
   my @idMismatch;
   my @ccuUndef;
   my @perfIoUndef;
-  my @aesInval;
   foreach my $eName (@entities){
     if ($defs{$eName}{helper}{role}{dev}){
       my $ehash = $defs{$eName};
@@ -667,8 +674,6 @@ sub HMinfo_paramCheck(@) { ####################################################
         }
       }
       if (!$IoDev)                  { push @noIoDev,$eName;}
-      elsif (AttrVal($eName,"aesCommReq",0) && $IoDev->{TYPE} ne "HMLAN")
-                                    { push @aesInval,"$eName ";}
                                     
       if (   !$defs{$eName}{helper}{role}{vrt} 
           && AttrVal($eName,"model","") ne "CCU-FHEM"){
@@ -683,7 +688,6 @@ sub HMinfo_paramCheck(@) { ####################################################
   $ret .="\n\n no IO device assigned"             ."\n    ".(join "\n    ",sort @noIoDev)    if (@noIoDev);
   $ret .="\n\n PairedTo missing/unknown"          ."\n    ".(join "\n    ",sort @noID)       if (@noID);
   $ret .="\n\n PairedTo mismatch to IODev"        ."\n    ".(join "\n    ",sort @idMismatch) if (@idMismatch);
-  $ret .="\n\n aesCommReq set, IO not compatibel" ."\n    ".(join "\n    ",sort @aesInval)   if (@aesInval);
   $ret .="\n\n IOgrp: CCU not found"              ."\n    ".(join "\n    ",sort @ccuUndef)   if (@ccuUndef);
   $ret .="\n\n IOgrp: prefered IO undefined"      ."\n    ".(join "\n    ",sort @perfIoUndef)if (@perfIoUndef);
  return  $ret;
@@ -695,7 +699,7 @@ sub HMinfo_tempList(@) { ######################################################
   $action = "" if (!$action);
   my %dl =("Sat"=>0,"Sun"=>1,"Mon"=>2,"Tue"=>3,"Wed"=>4,"Thu"=>5,"Fri"=>6);
   my $ret;
-
+  
   if    ($action eq "save"){
 #    foreach my $eN(HMinfo_getEntities("d")){#search and select channel
 #      my $md = AttrVal($eN,"model","");
@@ -747,41 +751,30 @@ sub HMinfo_tempList(@) { ######################################################
       }
     }
     my  @oldList;
-    if (-f $fName ){
-      open(aRead, "$fName") || return("Can't open $fName: $!");
-      my $skip = 0;
-      while(<aRead>){
-        chomp;
-        my $line = $_;
-        $line =~ s/\r//g;
-        if ($line =~ m/entities:(.*)/){
-          my $eFound = $1;
-          if (grep /\b$eFound\b/,@chList){
-            # renew this entry
-            $skip = 1;
-          }
-          else{
-            $skip = 0;
-          }
+    
+    my ($err,@RLines) = FileRead($fName);
+    push (@RLines, "#init")  if ($err);
+    my $skip = 0;
+    foreach(@RLines){
+      chomp;
+      my $line = $_;
+      $line =~ s/\r//g;
+      if ($line =~ m/entities:(.*)/){
+        my $eFound = $1;
+        if (grep /\b$eFound\b/,@chList){
+          # renew this entry
+          $skip = 1;
         }
-        push @oldList,$line if (!$skip);
+        else{
+          $skip = 0;
+        }
       }
-      close(aRead);
+      push @oldList,$line if (!$skip);
     }
-   open(aSave, ">$fName") || return("Can't open $fName: $!");
-   foreach my $line (@oldList,@storeList){
-     print aSave "\n$line";
-#     my @tl = sort grep /tempList(P[123])?[SMFWT]/,keys %{$defs{$chN}{READINGS}};
-#     if (scalar @tl != 7 && scalar @tl != 21){
-#       print aSave "\nincomplete:$chN only data for ".join(",",@tl);
-#       push @incmpl,$chN;
-#       next;
-#     }
-#     foreach my $rd (@tl){
-#       print aSave "\n$rd>$defs{$chN}{READINGS}{$rd}{VAL}";
-#     }
-   }
-   close(aSave);
+    my @WLines = grep !/^$/,(@oldList,@storeList);
+    $err = FileWrite($fName,@WLines);
+    return "file: $fName error write:$err"  if ($err);
+
     $ret = "incomplete data for ".join("\n     ",@incmpl) if (scalar@incmpl);
   }
   elsif ($action =~ m/(verify|restore)/){
@@ -810,7 +803,7 @@ sub HMinfo_tempListTmpl(@) { ##################################################
   return "no entities selected" if (!scalar @el);
 
   $fName = HMinfo_tempListDefFn($fName);
-  $tmpl =  $fName.":".$tmpl                              if($tmpl);
+  $tmpl =  $fName.":".$tmpl if($tmpl);
   my @rs;
   foreach my $name (@el){
    my $tmplDev = $tmpl ? $tmpl
@@ -858,16 +851,17 @@ sub HMinfo_tempListTmplView() { ###############################################
     }
   }
   @tlFiles = HMinfo_noDup(@tlFiles);
-  foreach my $fn (@tlFiles){#################################
-    if (!(-r $fn)){
-      push @tlFileMiss,$fn;
+  foreach my $fName (@tlFiles){#################################
+    my ($err,@RLines) = FileRead($fName);
+    if ($err){
+      push @tlFileMiss,"$fName - $err";
       next;
     }
-    open(aSave, "$fn") || return("Can't open $fn: $!");
-    push @tNfound,"$fn:";
-    my $l = length($fn)+3;
+
+    push @tNfound,"$fName:";
+    my $l = length($fName)+3;
     my $spc = sprintf("%${l}s"," ");
-    while(<aSave>){
+    foreach(@RLines){
       chomp;
       my $line = $_;
       $line =~ s/\r//g;
@@ -880,7 +874,6 @@ sub HMinfo_tempListTmplView() { ###############################################
         }
       }  
     }
-    close (aSave);
   }
   foreach my $d (keys %tlEntitys){
     $tlEntitys{$d}{c} = CUL_HM_tempListTmpl($d,"verify",$tlEntitys{$d}{t});
@@ -902,16 +895,18 @@ sub HMinfo_tempListTmplView() { ###############################################
   return $ret;
 }
 sub HMinfo_tempListDefFn(@) { #################################################
-  #return Default filename for tempList
   my ($fn) = shift;
   $fn = "" if (!defined $fn);
   my $ret = "";
-  my ($n) =devspec2array("TYPE=HMinfo");
-  $ret .= "$attr{global}{modpath}/"                  if (!$fn || $fn !~ m/^\//);  #no path? add modpath
-  $ret .= AttrVal($n,"configDir",".")."/"            if (!$fn || $fn !~ m/..*\//);#no dir?  add defDir
-  if (!$fn){                                                                      #set filename
-    my ($f) = split(",",AttrVal($n,"configTempFile","tempList.cfg"));
-    $ret .= $f;
+  
+  if($fn !~ m/\//){   # filename already with path - dont change
+    my ($n) = devspec2array("TYPE=HMinfo");
+    $ret .= AttrVal($n,"configDir",".")."/"            if ( !$fn  || $fn  !~ m/^\//);#no dir?  add defDir
+    $ret  = AttrVal("global","modpath",".")."/$ret"    if ( !$ret || $ret !~ m/^\//);#no path? add modpath
+    if (!$fn){          #set filename
+      my ($f) = split(",",AttrVal($n,"configTempFile","tempList.cfg"));
+      $ret .= $f;
+    }
   }
   return $ret.$fn;
 }
@@ -923,21 +918,21 @@ sub HMinfo_listOfTempTemplates() { ############################################
   my @tFiles = split(";",AttrVal($n,"configTempFile","tempList.cfg"));
   my $tDefault = $dir.$tFiles[0].":";
   my @tmpl;
-  foreach my $fn (map{$dir.$_}@tFiles){
-    next if (!(-r $fn));
-
-    open(aSave, "$fn") || return("Can't open $fn: $!");
-    while(<aSave>){
+  
+  foreach my $fName (map{$dir.$_}@tFiles){
+    my ($err,@RLines) = FileRead($fName);
+    next if ($err);
+    
+    foreach(@RLines){
       chomp;
       my $line = $_;
       $line =~ s/\r//g;
       if($line =~ m/^entities:(.*)/){
         my $l =$1;
         $l =~s/.*://;
-        push @tmpl,map{"$fn:$_"}split(",",$l);
+        push @tmpl,map{"$fName:$_"}split(",",$l);
       }  
     }
-    close (aSave);
   }
   @tmpl = map{s/$tDefault//;$_} @tmpl;
   $defs{$n}{helper}{weekplanList}     = \@tmpl;
@@ -950,10 +945,9 @@ sub HMinfo_listOfTempTemplates() { ############################################
 }
 
 sub HMinfo_tempListTmplGenLog($$) { ###########################################
-  my ($hiN,$fN) = @_;
+  my ($hiN,$fName) = @_;
+  $fName = HMinfo_tempListDefFn($fName);
 
-  $fN = HMinfo_tempListDefFn($fN);
-  open(fnRead, $fN) || return("Can't open file: $!");
   my @eNl = ();
   my %wdl = ( tempListSun =>"02"
              ,tempListMon =>"03"
@@ -963,7 +957,11 @@ sub HMinfo_tempListTmplGenLog($$) { ###########################################
              ,tempListFri =>"07"
              ,tempListSat =>"08");
   my @plotL;
-  while(<fnRead>){
+  
+  my ($err,@RLines) = FileRead($fName);
+  return "file: $fName error:$err"  if ($err);
+
+  foreach(@RLines){
     chomp;
     my $line = $_;
 
@@ -993,51 +991,52 @@ sub HMinfo_tempListTmplGenLog($$) { ###########################################
       }
     }
   }
-  close (fnRead);
-  open(fnSave, ">${fN}.log") || return("Can't openfile for write: $!");
+  
+  my @WLines;
   my %eNh;
   foreach (sort @plotL){
-    print fnSave "\n$_";
+    push @WLines,$_;
     my (undef,$eN) = split " ",$_;
     $eNh{$eN} = 1;
   }
-  close (fnSave);
-  HMinfo_tempListTmplGenGplot($fN,keys %eNh);
+  $err = FileWrite($fName,@WLines);
+  return "file: $fName error write:$err"  if ($err);
+  HMinfo_tempListTmplGenGplot($fName,keys %eNh);
 }
 sub HMinfo_tempListTmplGenGplot(@) { ##########################################
-  my ($fN,@eN) = @_;
-  my $fNfull = $fN;
-  $fN =~ s/.cfg$//; # remove extention
-  $fN =~ s/.*\///; # remove directory
-#define weekLogF FileLog ./setup/tempList.cfg.log none
-#define wp SVG weekLogF:tempList:CURRENT
-#attr wp fixedrange week
-#attr wp startDate 2000-01-02
-  if (!defined($defs{"${fN}_Log"})){
-    CommandDefine(undef,"${fN}_Log FileLog ${fNfull}.log none");
+  my ($fName,@eN) = @_;
+  my $fNfull = $fName;
+  $fName =~ s/.cfg$//; # remove extention
+  $fName =~ s/.*\///; # remove directory
+      #define weekLogF FileLog ./setup/tempList.cfg.log none
+      #define wp SVG weekLogF:tempList:CURRENT
+      #attr wp fixedrange week
+      #attr wp startDate 2000-01-02
+  if (!defined($defs{"${fName}_Log"})){
+    CommandDefine(undef,"${fName}_Log FileLog ${fNfull}.log none");
   }
-  if (!defined($defs{"${fN}_SVG"})){
-    CommandDefine(undef,"${fN}_SVG SVG ${fN}_Log:${fN}:CURRENT");
-    CommandAttr(undef, "${fN}_SVG fixedrange week");
-    CommandAttr(undef, "${fN}_SVG startDate 2000-01-02");
+  if (!defined($defs{"${fName}_SVG"})){
+    CommandDefine(undef,"${fName}_SVG SVG ${fName}_Log:${fName}:CURRENT");
+    CommandAttr(undef, "${fName}_SVG fixedrange week");
+    CommandAttr(undef, "${fName}_SVG startDate 2000-01-02");
   }
 
-  $fN = "./www/gplot/$fN.gplot";
-  open(bSave, ">$fN") || return("Can't open $fN for write: $!");
-  print bSave "\n# Created by FHEM/98_HMInfo.pm, "
-             ."\nset terminal png transparent size <SIZE> crop"
-             ."\nset output '<OUT>.png'"
-             ."\nset xdata time"
-             ."\nset timefmt \"%Y-%m-%d_%H:%M:%S\""
-             ."\nset xlabel \" \""
-             ."\nset title 'weekplan'"
-             ."\nset ytics "
-             ."\nset grid ytics"
-             ."\nset ylabel \"Temperature\""
-             ."\nset y2tics "
-             ."\nset y2label \"invisib\""
-             ."\nset y2range [99:99]"
-             ."\n";
+  $fName = "./www/gplot/$fName.gplot";
+  my @WLines;
+  push @WLines,"# Created by FHEM/98_HMInfo.pm, ";
+  push @WLines,"set terminal png transparent size <SIZE> crop";
+  push @WLines,"set output '<OUT>.png'";
+  push @WLines,"set xdata time";
+  push @WLines,"set timefmt \"%Y-%m-%d_%H:%M:%S\"";
+  push @WLines,"set xlabel \" \"";
+  push @WLines,"set title 'weekplan'";
+  push @WLines,"set ytics ";
+  push @WLines,"set grid ytics";
+  push @WLines,"set ylabel \"Temperature\"";
+  push @WLines,"set y2tics ";
+  push @WLines,"set y2label \"invisib\"";
+  push @WLines,"set y2range [99:99]";
+  push @WLines," ";
 
   my $cnt = 0;
   my ($func,$plot) = ("","\n\nplot");
@@ -1049,8 +1048,9 @@ sub HMinfo_tempListTmplGenGplot(@) { ##########################################
     }
   }
   
-  print bSave  $func.$plot;
-  close (bSave);
+  push @WLines,$func.$plot;
+  my $err = FileWrite($fName,@WLines);
+  return "file: $fName error write:$err"  if ($err);
 }
 
 sub HMinfo_getEntities(@) { ###################################################
@@ -1647,7 +1647,12 @@ sub HMinfo_SetFn($@) {#########################################################
     # save config only if register are complete
     $ret = HMinfo_archConfig($hash,$name,$opt,($a[0]?$a[0]:""));
   }
-
+  elsif($cmd eq "x-deviceReplace") {##action: deviceReplace--------------------
+    # replace a device with a new one
+    $ret = HMinfo_deviceReplace($name,$a[0],$a[1]);
+  }
+  
+  
   ### redirect set commands to get - thus the command also work in webCmd
   elsif($cmd ne '?' && HMinfo_GetFn($hash,$name,"?") =~ m/\b$cmd\b/){##----------------
     unshift @a,"-f",$filter if ($filter);
@@ -1664,6 +1669,7 @@ sub HMinfo_SetFn($@) {#########################################################
             ,"update:noArg"
             ,"cpRegs"
             ,"tempList"
+            ,"x-deviceReplace"
             ,"tempListG:verify,status,save,restore,genPlot"
             ,"templateDef","templateSet","templateDel","templateExe"
             );
@@ -1686,6 +1692,7 @@ sub HMInfo_help(){ ############################################################
            ."\n set verifyConfig [-typeFilter-] -file-             # compare curent date with configfile,report differences"
            ."\n set autoReadReg [-typeFilter-]                     # trigger update readings if attr autoReadReg is set"
            ."\n set tempList [-typeFilter-][save|restore|verify|status|genPlot][-filename-]# handle tempList of thermostat devices"
+           ."\n set x-deviceReplace <old device> <new device>      # WARNING:replace a device with another"
            ."\n  ---infos---"
            ."\n set update                                         # update HMindfo counts"
            ."\n get register [-typeFilter-]                        # devicefilter parse devicename. Partial strings supported"
@@ -2115,6 +2122,201 @@ sub HMinfo_archConfigPost($)  {################################################
   return ;
 }
 
+sub HMinfo_deviceReplace($$$){
+  my ($hmName,$oldDev,$newDev) = @_;
+  my $logH = $defs{$hmName};
+  
+  my $preReply = $defs{$hmName}{helper}{devRepl}?$defs{$hmName}{helper}{devRepl}:"empty";
+  $defs{$hmName}{helper}{devRepl} = "empty";# remove task. 
+  
+  return "only valid for CUL_HM devices" if(  !$defs{$oldDev}{helper}{role}{dev} 
+                                            ||!$defs{$newDev}{helper}{role}{dev} );
+  return "use 2 different devices" if ($oldDev eq $newDev);
+  
+  my $execMode     = 0;# replace will be 2 stage: execMode 0 will not execute any action
+  my $prepComplete = 0; # if preparation is aboard (prepComplete =0) the attempt will be ignored
+  my $ret = "deviceRepleace - actions";
+  if ( $preReply eq $oldDev."-".$newDev){
+    $execMode = 1;
+    $ret .= "\n        ==>EXECUTING: set $hmName x-deviceReplace $oldDev $newDev";
+  }
+  else{
+    $ret .= "\n       --- CAUTION: this command will reprogramm fhem AND the devices incl peers";
+    $ret .= "\n           $oldDev will be replaced by $newDev  ";
+    $ret .= "\n           $oldDev can be removed after execution.";
+    $ret .= "\n           Peers of the device will also be reprogrammed ";
+    $ret .= "\n           command execution may be pending in cmdQueue depending on the device types ";
+    $ret .= "\n           thoroughly check the protocoll events";
+    $ret .= "\n           NOTE: The command is not revertable!";
+    $ret .= "\n                 The command can only be executed once!";
+    $ret .= "\n        ==>TO EXECUTE THE COMMAND ISSUE AGAIN: set $hmName x-deviceReplace $oldDev $newDev";
+    $ret .= "\n";
+  }
+  
+  #create hash to map old and new device
+  my %rnHash;
+  $rnHash{old}{dev}=$oldDev;
+  $rnHash{new}{dev}=$newDev;
+  
+  my $oldID = $defs{$oldDev}{DEF}; # device ID old
+  my $newID = $defs{$newDev}{DEF}; # device ID new
+  foreach my $i(grep /channel_../,keys %{$defs{$oldDev}}){
+    # each channel of old device needs a pendant in new
+    return "channels incompatible for $oldDev: $i" if (!$defs{$oldDev}{$i} || ! defined $defs{$defs{$oldDev}{$i}});
+    $rnHash{old}{$i}=$defs{$oldDev}{$i};
+
+    if ($defs{$newDev}{$i} && defined $defs{$defs{$newDev}{$i}}){
+      $rnHash{new}{$i}=$defs{$newDev}{$i};
+      return "new channel $i already has peers" if(defined $attr{$rnHash{$_}{new}}{peerIDs} 
+                                                   &&      $attr{$rnHash{$_}{new}}{peerIDs} ne "0000000");
+    }
+    else{
+      return "channel list incompatible for $newDev: $i";
+    }
+  }
+  # each old channel has a pendant in new channel
+  # lets begin
+  #1  --- foreach entity  => rename old>"old-".<name> and new><name>
+  #2  --- foreach channel => copy peers (peerBulk)
+  #3  --- foreach channel => copy registerlist (regBulk)
+  #4  --- foreach channel => copy templates 
+  #5  --- foreach peer (search)
+  #5a                           => add new peering
+  #5b                           => apply reglist for new peer
+  #5c                           => remove old peering
+  #5d                           => update peer templates
+  
+  
+  my @rename = ();# logging only
+  {#1  --- foreach entity  => rename old=>"old-".<name> and new=><name>
+    push @rename,"1) rename";
+    foreach my $i(sort keys %{$rnHash{old}}){
+      my $old = $rnHash{old}{$i};
+      if ($execMode){
+        AnalyzeCommand("","rename $old old-$old");
+        AnalyzeCommand("","rename $rnHash{new}{$i} $old");
+      }
+      push @rename,"1)- $oldDev - $i: rename $old old-$old";
+      push @rename,"1)- $newDev - $i: $rnHash{new}{$i} $old";
+    }
+    if ($execMode){
+      foreach my $name(keys %{$rnHash{old}}){# correct hash internal for further processing
+        $rnHash{new}{$name} = $rnHash{old}{$name};
+        $rnHash{old}{$name} = "old-".$rnHash{old}{$name};
+      }
+    }
+  }
+  {#2  --- foreach channel => copy peers (peerBulk) from old to new
+    push @rename,"2) copy peers from old to new";
+    foreach my $ch(sort keys %{$rnHash{old}}){
+      my ($nameO,$nameN) = ($rnHash{old}{$ch},$rnHash{new}{$ch});
+      next if(!defined $attr{$nameO}{peerIDs});
+      my $peerList = join(",",grep !/(00000000|$oldID..)/, split(",",$attr{$nameO}{peerIDs}));
+      if ($execMode){
+        CUL_HM_Set($defs{$nameN},$nameN,"peerBulk",$peerList,"set") if($peerList);
+      }
+      push @rename,"2)-      $ch: set $nameN peerBulk $peerList" if($peerList);
+    }
+  }
+  {#3  --- foreach channel => copy registerlist (regBulk)
+    push @rename,"3) copy registerlist from old to new";
+    foreach my $ch(sort keys %{$rnHash{old}}){
+      my ($nameO,$nameN) = ($rnHash{old}{$ch},$rnHash{new}{$ch});
+      foreach my $regL(sort  grep /RegL_..\./,keys %{$defs{$nameO}{READINGS}}){
+        my $regLp = $regL; 
+        $regLp =~ s/^\.//;#remove leading '.' 
+        if ($execMode){
+          CUL_HM_Set($defs{$nameN},$nameN,"regBulk",$regLp,$defs{$nameO}{READINGS}{$regL}{VAL});
+        }
+        push @rename,"3)-      $ch: set $nameN regBulk $regLp ...";
+      }
+    }
+  }
+  {#4  --- foreach channel => copy templates 
+    push @rename,"4) copy templates from old to new";
+    if (eval "defined(&HMinfo_templateDel)"){# check templates
+      foreach my $ch(sort keys %{$rnHash{old}}){
+        my ($nameO,$nameN) = ($rnHash{old}{$ch},$rnHash{new}{$ch});
+        if($defs{$nameO}{helper}{tmpl}){
+          foreach(sort keys %{$defs{$nameO}{helper}{tmpl}}){
+            my ($pSet,$tmplID) = split(">",$_);
+            my @p = split(" ",$defs{$nameO}{helper}{tmpl}{$_});
+            if ($execMode){
+              HMinfo_templateSet($nameN,$tmplID,$pSet,@p);
+            }
+            push @rename,"4)-      $ch: templateSet $nameN,$tmplID,$pSet ".join(",",@p);
+          }
+        }
+      }
+    }
+  }
+  {#5  --- foreach peer (search) - remove peers old peer and set new
+    push @rename,"5) for peer devices: remove ols peers";
+    foreach my $ch(sort keys %{$rnHash{old}}){
+      my ($nameO,$nameN) = ($rnHash{old}{$ch},$rnHash{new}{$ch});
+      next if (!$attr{$nameO}{peerIDs});
+      foreach my $pId(grep !/(00000000|$oldID..)/, split(",",$attr{$nameO}{peerIDs})){
+        my ($oChId,$nChId) = (substr($defs{$nameO}{DEF}."01",0,8)
+                             ,substr($defs{$nameN}{DEF}."01",0,8));# obey that device may be channel 01
+        my $peerName = CUL_HM_id2Name($pId);
+
+        { #5a) add new peering
+          if ($execMode){
+            CUL_HM_Set($defs{$peerName},$peerName,"peerBulk",$nChId,"set");  #set new in peer
+          }
+          push @rename,"5)-5a)-  $ch: set $peerName peerBulk $nChId set";
+        }
+        { #5b) apply reglist for new peer
+          foreach my $regL( grep /RegL_..\.$nameO/,keys %{$defs{$peerName}{READINGS}}){
+            my $regLp = $regL; 
+            $regLp =~ s/^\.//;#remove leading '.' 
+            if ($execMode){
+              CUL_HM_Set($defs{$peerName},$peerName,"regBulk",$regLp,$defs{$peerName}{READINGS}{$regL}{VAL});
+            }
+            push @rename,"5)-5b)-  $ch: set $peerName regBulk $regLp ...";
+          }
+        }
+        { #5c) remove old peering
+          if ($execMode){
+            CUL_HM_Set($defs{$peerName},$peerName,"peerBulk",$oChId,"unset");#remove old from peer          
+          }
+          push @rename,"5)-5c)-  $ch: set $peerName peerBulk $oChId unset";
+        }
+        { #5d) update peer templates
+          if (eval "defined(&HMinfo_templateDel)"){# check templates
+            if($defs{$peerName}{helper}{tmpl}){
+              foreach(keys %{$defs{$peerName}{helper}{tmpl}}){
+                my ($pSet,$tmplID) = split(">",$_);
+                $pSet =~ s/$nameO/$nameN/;
+                my @p = split(" ",$defs{$peerName}{helper}{tmpl}{$_});
+                if ($execMode){
+                  HMinfo_templateSet($peerName,$tmplID,$pSet,@p);
+                }
+                push @rename,"5)-5d)-  $ch: templateSet $peerName,$tmplID,$pSet ".join(",",@p);
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  push @rename,"5)-5a) add new peering";
+  push @rename,"5)-5b) apply reglist for new peer";
+  push @rename,"5)-5c) remove old peering";
+  push @rename,"5)-5d) update peer templates";
+  foreach my $prt(sort @rename){# logging
+    $prt =~ s/.\)\-/   /;
+    $prt =~ s/   ..\)\-/       /;
+    if ($execMode){ Log3 ($logH,3,"Rename: $prt");}
+    else          { $ret .= "\n    $prt";         }      
+  }
+  if (!$execMode){# we passed preparation mode. Remember to execute it next time
+    $defs{$hmName}{helper}{devRepl} = $oldDev."-".$newDev;
+  }
+
+  return $ret;
+}
+
 sub HMinfo_configCheck ($){ ###################################################
   my ($param) = shift;
   my ($id,$opt,$filter) = split ",",$param;
@@ -2232,7 +2434,7 @@ sub HMinfo_bpAbort($) {#bp timeout ############################################
   return;
 }
 
-sub HMinfo_templateChk_Get ($){ ###############################################
+sub HMinfo_templateChk_Get($){ ################################################
   my ($param) = shift;
   my ($id,$opt,$filter,@a) = split ",",$param;
   $opt = "" if(!defined $opt);
@@ -2264,6 +2466,7 @@ sub HMinfo_templateDef(@){#####################################################
   return "insufficient parameter, no param" if(!defined $param);
   $tmplDefChange = 1;# signal we have a change!
   if ($param eq "del"){
+    return "template in use, cannot be deleted" if(HMinfo_templateUsg("","",$name));
     delete $HMConfig::culHmTpl{$name};
     return;
   }
@@ -2996,7 +3199,13 @@ sub HMinfo_noDup(@) {#return list with no duplicates###########################
       <li><a name="#HMinfotemplateExe">templateExe</a> &lt;template&gt; <br>
           executes the register write once again if necessary (e.g. a device had a reset)<br>
       </li>
-
+      <li><a name="#HMinfodeviceReplace">x-deviceReplace</a> &lt;oldDevice&gt; &lt;newDevice&gt; <br>
+          replacement of an old or broken device with a replacement. The replacement needs to be compatible - FHEM will check this partly. It is up to the user to use it carefully. <br>
+          The command needs to be executed twice for safety reasons. The first call will return with CAUTION remark. Once issued a second time the old device will be renamed, the new one will be named as the old one. Then all peerings, register and templates are corrected as best as posible. <br>
+          NOTE: once the command is executed devices will be reconfigured. This cannot be reverted automatically.  <br>
+          Replay of teh old confg-files will NOT restore the former configurations since also registers changed! Exception: proper and complete usage of templates!<br>
+          In case the device is configured using templates with respect to registers a verification of the procedure is very much secure. Otherwise it is up to the user to supervice message flow for transmission failures. <br>
+      </li>
   </ul>
   <br>
 
@@ -3441,6 +3650,14 @@ sub HMinfo_noDup(@) {#return list with no duplicates###########################
       <li><a name="#HMinfotemplateExe">templateExe</a> &lt;template&gt; <br>
           führt das templateSet erneut aus. Die Register werden nochmals geschrieben, falls sie nicht zum template passen. <br>
       </li>
+      <li><a name="#HMinfodeviceReplace">x-deviceReplace</a> &lt;oldDevice&gt; &lt;newDevice&gt; <br>
+          Ersetzen eines alten oder defekten Device. Das neue Ersatzdevice muss kompatibel zum Alten sein - FHEM prüft das nur rudimentär. Der Anwender sollt es sorgsam prüfen.<br>
+          Das Kommando muss aus Sicherheitsgründen 2-fach ausgeführt werden. Der erste Aufruf wird mit einem CAUTION quittiert. Nach Auslösen den Kommandos ein 2. mal werden die Devices umbenannt und umkonfiguriert. Er werden alle peerings, Register und Templates im neuen Device UND allen peers umgestellt.<br>
+          ACHTUNG: Nach dem Auslösen kann die Änderung nicht mehr automatisch rückgängig gemacht werden. Manuell ist das natürlich möglich.<br> 
+          Auch ein ückspring auf eine ältere Konfiguration erlaubt KEIN Rückgängigmachen!!!<br>          
+          Sollte das Device und seine Kanäle über Templates definiert sein  - also die Registerlisten - kann im Falle von Problemen in der Übertragung - problemlos wieder hergestellt werden. <br>
+      </li>
+
     </ul>
   </ul>
   <br>

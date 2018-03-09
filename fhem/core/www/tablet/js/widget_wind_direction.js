@@ -10,9 +10,7 @@
 "use strict";
 
 function depends_wind_direction() {
-    if (typeof Modul_volume == 'undefined' || !$.fn.knob) {
         return ["volume"];
-    }
 }
 
 var Modul_wind_direction = function () {
@@ -23,9 +21,10 @@ var Modul_wind_direction = function () {
 
     function init() {
 
-        me.elements = $('div[data-type="' + me.widgetname + '"]', me.area);
+        me.elements = $('div[data-type="' + me.widgetname + '"]:not([data-ready])', me.area);
         me.elements.each(function (index) {
             var elem = $(this);
+            elem.attr("data-ready", "");
 
             // height and width can't be different
             elem.data('size', 1 * elem.attr('data-height') || 1 * elem.attr('data-width') || 1 * elem.attr('data-size') || 150);

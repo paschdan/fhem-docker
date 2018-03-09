@@ -1,5 +1,5 @@
 ################################################################
-# $Id: 98_update.pm 15377 2017-11-01 16:59:23Z rudolfkoenig $
+# $Id: 98_update.pm 15862 2018-01-12 21:01:28Z rudolfkoenig $
 
 package main;
 use strict;
@@ -250,7 +250,7 @@ doUpdate($$$$)
 
   if(AttrVal("global", "backup_before_update", 0) &&
      $arg ne "check" && $curr==1) {
-    my $cmdret = AnalyzeCommand(undef, "backup");
+    my $cmdret = AnalyzeCommand(undef, "backup startedByUpdate");
     if ($cmdret !~ m/backup done.*/) {
       uLog 1, "Something went wrong during backup: $cmdret";
       uLog 1, "update was canceled. Please check manually!";
@@ -496,7 +496,6 @@ upd_getUrl($)
   $url =~ s/%/%25/g;
   $upd_connecthash{url} = $url;
   $upd_connecthash{keepalive} = ($url =~ m/localUpdate/ ? 0 : 1); # Forum #49798
-  # $upd_connecthash{compress} = 1; # fhem.de does not support compression
   my ($err, $data) = HttpUtils_BlockingGet(\%upd_connecthash);
   if($err) {
     uLog 1, $err;

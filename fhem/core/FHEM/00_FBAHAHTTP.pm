@@ -1,5 +1,5 @@
 ##############################################
-# $Id: 00_FBAHAHTTP.pm 15437 2017-11-16 08:48:48Z rudolfkoenig $
+# $Id: 00_FBAHAHTTP.pm 15802 2018-01-06 16:01:17Z rudolfkoenig $
 package main;
 
 # Documentation: AHA-HTTP-Interface.pdf, AVM_Technical_Note_-_Session_ID.pdf
@@ -21,7 +21,7 @@ FBAHAHTTP_Initialize($)
   $hash->{RenameFn} = "FBAHAHTTP_RenameFn";
   $hash->{DeleteFn} = "FBAHAHTTP_Delete";
   $hash->{AttrList} = "dummy:1,0 fritzbox-user polltime async_delay ".
-                      "disable:0,1 disabledForIntervals";
+                      "disable:0,1 disabledForIntervals fbTimeout";
 }
 
 
@@ -74,6 +74,7 @@ FBAHAHTTP_connect($)
   my $dr = sub {
     $hash->{STATE} = $_[0];
     Log 2, $hash->{STATE};
+    $hash->{CmdStack} = ();
     return $hash->{STATE};
   };
 
@@ -132,6 +133,7 @@ FBAHAHTTP_Poll($)
     url=>"http://$hash->{DEF}/webservices/homeautoswitch.lua?sid=$sid".
          "&switchcmd=getdevicelistinfos",
     loglevel => AttrVal($name, "verbose", 4),
+    timeout => AttrVal($name, "fbTimeout", 4),
     callback => sub {
       if($_[1]) {
         Log3 $name, 3, "$name: $_[1]";
@@ -222,6 +224,7 @@ FBAHAHTTP_ProcessStack($)
   HttpUtils_NonblockingGet({
     url=>"http://$hash->{DEF}/webservices/homeautoswitch.lua?$msg",
     loglevel => AttrVal($name, "verbose", 4),
+    timeout => AttrVal($name, "fbTimeout", 4),
     callback => sub {
       if($_[1]) {
         Log3 $name, 3, "$name: $_[1]";
@@ -332,6 +335,12 @@ FBAHAHTTP_Write($$$)
   <a name="FBAHAHTTPattr"></a>
   <b>Attributes</b>
   <ul>
+    <li><a href="#async_delay">async_delay</a><br>
+      additional delay inserted, when switching more than one device, default
+      is 0.2 seconds. Note: even with async_delay 0 there will be a delay, as
+      FHEM avoids sending commands in parallel, to avoid malfunctioning of the
+      Fritz!BOX AHA server).
+      </li>
     <li><a href="#disable">disable</a></li>
     <li><a href="#disabledForIntervals">disabledForIntervals</a></li>
     <li><a href="#dummy">dummy</a></li>
@@ -339,14 +348,9 @@ FBAHAHTTP_Write($$$)
     <li><a name="polltime">polltime</a><br>
       measured in seconds, default is 300 i.e. 5 minutes
       </li>
-
-    <li><a href="#async_delay">async_delay</a><br>
-      additional delay inserted, when switching more than one device, default
-      is 0.2 seconds. Note: even with async_delay 0 there will be a delay, as
-      FHEM avoids sending commands in parallel, to avoid malfunctioning of the
-      Fritz!BOX AHA server).
+    <li><a name="fbTimeout">fbTimeout</a><br>
+      timeout for getting answer from the Fritz!BOX. Default is 4 (seconds).
       </li>
-
   </ul>
   <br>
 </ul>

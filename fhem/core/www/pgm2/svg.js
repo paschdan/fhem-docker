@@ -1,6 +1,7 @@
 "use strict";
-FW_version["svg.js"] = "$Id: svg.js 13579 2017-03-02 12:39:59Z rudolfkoenig $";
+FW_version["svg.js"] = "$Id: svg.js 15896 2018-01-14 21:35:42Z rudolfkoenig $";
 
+var svgCallback={};
 if(!svgNS) {
   var svgNS = "http://www.w3.org/2000/svg";
   var svg_initialized={}, lastHidden;
@@ -343,6 +344,8 @@ svg_init_one(embed, svg)
     return;
   svg_initialized[sid] = true;
   $("text.legend", svg).click(function(e){sv_menu(e, embed)});
+  for(var i in svgCallback)
+    svgCallback[i](svg);
 }
 
 function
@@ -352,7 +355,7 @@ svg_init(par)    // also called directly from perl, in race condition
     var e = this;
     var src = $(e).attr("src");
     var ed = FW_getSVG(e);
-    if(src.indexOf("SVG_showLog") < 0 || !ed)
+    if(!src || src.indexOf("SVG_showLog") < 0 || !ed)
       return;
     var sTag = $("svg", ed)[0]; // "not well-formed" warning in FireFox
     if((par && $(sTag).attr("id") != par))

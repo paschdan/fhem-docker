@@ -18,7 +18,6 @@
     <div id="logo"></div>
     <div id="menu">
       <h3>fhem.pl reference</h3>
-      Version: <b>EN</b>&nbsp;<a href="commandref_DE.html">DE</a>
       <br><br>
       <a href="#doctop">Scroll to top</a>
       <br><br>
@@ -271,8 +270,9 @@ A line ending with \ will be concatenated with the next one, so long lines
   <li>a NAME=VALUE pair, where NAME can be an internal value like TYPE, a
         Reading-Name or an attribute. VALUE is a regexp. To negate the
         comparison, use NAME!=VALUE. To restrict the search, use i: as prefix
-        for internal values, r: for readings and a: for attributes. See the
-        example below.</li>
+        for internal values, r: for readings and a: for attributes. 
+        See the example below.
+        Case sensitivity is being ignored using ~ or !~. </li>
   <li>if the spec is followed by the expression :FILTER=NAME=VALUE, then the
       values found in the first round are filtered by the second expression.
   </ul>
@@ -285,6 +285,7 @@ A line ending with \ will be concatenated with the next one, so long lines
     <code>set room=kitchen:FILTER=STATE=on off</code><br>
     <code>set room=kitchen:FILTER=STATE!=off off</code><br>
     <code>list disabled=</code><br>
+    <code>list room~office</code><br>
     <code>list TYPE=FS20 STATE</code><br>
     <code>list i:TYPE=FS20 STATE</code><br>
   </ul>
@@ -369,10 +370,10 @@ Device specific attributes are documented in the corresponding device section.
         </code></ul>
         The explicit variant of this attribute has the following syntax:
         <ul><code>
-        attr store eventMap { dev=>{"on"=>"open"}, usr=>{"open"=>"on"} }<br>
-        attr store eventMap { dev=>{"^on(-for-timer)?(.*)"=>"open$2"},
-                              usr=>{"^open(.*)"=>"on$1"},
-                              fw=>{"^open(.*)"=>"open"} }
+        attr store eventMap { dev=>{'on'=>'open'}, usr=>{'open'=>'on'} }<br>
+        attr store eventMap { dev=>{'^on(-for-timer)?(.*)'=>'open$2'},
+                              usr=>{'^open(.*)'=>'on$1'},
+                              fw=>{'^open(.*)'=>'open'} }
         </code></ul>
         This variant must be used, if the mapping is not symmetrical, the first
         part (dev) representing the device to user mapping, i.e. if the device
@@ -407,12 +408,13 @@ Device specific attributes are documented in the corresponding device section.
 
     <a name="room"></a>
     <li>room<br>
-        Filter/group devices. Recognized by web-pgm2 and web-pgm3.  A device
-        can appear in more than one room, in this case the rooms have to be
-        specified comma-separated.<br>
+        Filter/group devices in frontends. A device can appear in more than one
+        room, in this case the rooms have to be specified comma-separated.<br>
         Devices in the room hidden will not appear in the web output, or set
-        the <a href="#hiddenroom"> FHEMWEB attribute to selectively disable
-        rooms for certain FHEMWEB instances.
+        the FHEMWEB attribute <a href="#hiddenroom">hiddenroom</a> to
+        selectively disable rooms for certain FHEMWEB instances.
+        The -&gt; string is considered as a structure separator for rooms, e.g.
+        "1st. floor-&gt;Master bedroom".
         </li><br>
 
     <a name="suppressReading"></a>
@@ -675,9 +677,10 @@ The following local attributes are used by a wider range of devices:
 <a name="attr"></a>
 <h3>attr</h3>
 <ul>
-  <code>attr &lt;devspec&gt; &lt;attrname&gt; [&lt;value&gt;] </code><br>
+  <code>attr [-a|-r] &lt;devspec&gt; &lt;attrname&gt; [&lt;value&gt;]</code><br>
 
   <br>Set an attribute for a device defined by <a href="#define">define</a>.
+  The value is optional, and is set to 1 if missing.
   You can define your own <a href="#attributes">attributes</a> too to use them
   in other applications.
 
@@ -685,19 +688,27 @@ The following local attributes are used by a wider range of devices:
   See the <a href="#devspec">Device specification</a> section for details on
   &lt;devspec&gt;.
   After setting the attribute, the global event "ATTR" will be generated.
-  <br><br>
+  <br>
+  If the option -a is specified, append the given value to the currently
+  existing value. Note: if the value does not start with a comma (,), then a
+  space will be added automatically to the old value before appending the
+  new.<br>
+  With the -r option one can remove a part of an attribute value.<br>
+  <br>
 
   Examples:
-  <ul>
-    <code>attr global verbose 3</code><br>
-    <code>attr lamp room kitchen</code><br>
-    <code>attr lamp group lights</code><br>
-    <code>attr lamp loglevel 6</code><br>
-    <code>attr weatherstation event-on-update-reading wind,temperature,humidity</code><br>
-    <code>attr weatherstation event-on-change-reading israining</code><br>
-    <code>attr weatherstation event-on-change-reading israining,state</code><br>
-    <code>attr heating stateFormat Temp:measured-temp, Valve:actuator</code><br>
-  </ul>
+  <ul><code>
+    attr global verbose 3<br>
+    attr lamp room kitchen<br>
+    attr lamp group lights<br>
+    attr lamp loglevel 6<br>
+    attr weatherstation event-on-update-reading wind,temperature,humidity<br>
+    attr weatherstation event-on-change-reading israining<br>
+    attr weatherstation event-on-change-reading israining,state<br>
+    attr heating stateFormat Temp:measured-temp, Valve:actuator<br>
+    attr -a TYPE=SVG room ,SvgRoom</br>
+    attr -r TYPE=SVG room ,SvgRoom</br>
+  </code></ul>
   <br>
 
   Notes:<br>
@@ -1178,6 +1189,9 @@ The following local attributes are used by a wider range of devices:
         </br>
         set the device on for the specified intervals, which are all timespecs
         in the form HH:MM[:SS]. The intervals are space separated.</li>
+    <li>toggle<br>
+        Issue the off command, if the current STATE is on, else the on command.
+        dim XX is also interpreted as on, if XX is not 0.</li>
   </ul>
   Examples:
   <ul>
@@ -1448,22 +1462,30 @@ The following local attributes are used by a wider range of devices:
         OS implementation (inet_aton and gethostbyname) will be used.
     </li><br>
 
-    <a name="holiday2we"></a>
-    <li>holiday2we<br>
-        If this attribute is set, then the <a href="#perl">$we</a> variable
-        will be true, if the value of the <a href="#holiday">holiday</a>
-        variable referenced by this attribute is not none.<br>
-        Example:<br>
-        <ul>
-          attr global holiday2we hessen
-        </ul>
-    </li><br>
-
     <a name="featurelevel"></a>
     <li>featurelevel<br>
         Enable/disable old or new features, based on FHEM version.
         E.g. the $value hash for notify is only set for featurelevel up to 5.6,
         as it is deprecated, use the Value() function instead.
+    </li><br>
+
+    <a name="holiday2we"></a>
+    <li>holiday2we<br>
+        If this attribute is set, then the <a href="#perl">$we</a> variable
+        will be true, if the value of the <a href="#holiday">holiday</a>
+        variable referenced by this attribute is not none.<br>
+        If it is a comma separated list, then it is true, if one of the
+        referenced entities is not none.<br>
+        Example:<br>
+        <ul>
+          attr global holiday2we he
+        </ul>
+    </li><br>
+
+    <a name="httpcompress"></a>
+    <li>httpcompress<br>
+        the HttpUtils module is used by a lot of FHEM modules, and enables
+        compression by default. Set httpcompress to 0 to disable this feature.
     </li><br>
 
     <a name="logdir"></a>

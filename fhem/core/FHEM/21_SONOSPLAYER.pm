@@ -1,9 +1,9 @@
 ########################################################################################
 #
-# SONOSPLAYER.pm (c) by Reiner Leins, July 2017
+# SONOSPLAYER.pm (c) by Reiner Leins, January 2018
 # rleins at lmsoft dot de
 #
-# $Id: 21_SONOSPLAYER.pm 14715 2017-07-14 10:39:57Z Reinerlein $
+# $Id: 21_SONOSPLAYER.pm 15823 2018-01-07 22:42:45Z Reinerlein $
 #
 # FHEM module to work with Sonos-Zoneplayers
 #
@@ -258,7 +258,7 @@ sub SONOSPLAYER_Detail($$$;$) {
 	return '' if (!ReadingsVal($d, 'IsMaster', 0) || (ReadingsVal($d, 'playerType', '') eq 'ZB100'));
 	
 	# Open incl. Inform-Div
-	my $html .= '<html><div informId="'.$d.'-display_covertitle">';
+	my $html .= '<html><div informid="'.$d.'-display_covertitle">';
 	
 	# Cover-/TitleView
 	$html .= '<div style="border: 1px solid gray; border-radius: 10px; padding: 5px;">';

@@ -8,18 +8,18 @@
 "use strict";
 
 function depends_dimmer() {
-    if (typeof Module_famultibutton == 'undefined' || !$.fn.famultibutton) {
         return ["famultibutton"];
-    }
 }
 
 var Modul_dimmer = function () {
 
     function init() {
 
-        me.elements = $('div[data-type="' + me.widgetname + '"]', me.area);
+        me.elements = $('div[data-type="' + me.widgetname + '"]:not([data-ready])', me.area);
         me.elements.each(function (index) {
             var elem = $(this);
+            elem.attr("data-ready", "");
+            
             elem.initData('off-color', ftui.getStyle('.dimmer.off', 'color') || '#2A2A2A');
             elem.initData('off-background-color', ftui.getStyle('.dimmer.off', 'background-color') || '#505050');
             elem.initData('on-color', ftui.getStyle('.dimmer.on', 'color') || '#2A2A2A');

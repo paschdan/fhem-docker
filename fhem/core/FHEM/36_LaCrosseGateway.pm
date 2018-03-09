@@ -1,4 +1,4 @@
-# $Id: 36_LaCrosseGateway.pm 15483 2017-11-23 20:03:23Z HCS $
+# $Id: 36_LaCrosseGateway.pm 15527 2017-11-30 14:25:16Z HCS $
 
 package main;
 
@@ -491,6 +491,9 @@ sub LaCrosseGateway_HandleKVP($$) {
   if($kvp =~ m/UpTimeText=(.*?)(\,|\ ,)/) {
     readingsBulkUpdate($hash, "UpTime", $1);
   }
+  if($kvp =~ m/UpTimeSeconds=(.*?)(\,|\ ,)/) {
+    readingsBulkUpdate($hash, "UpTimeSeconds", $1);
+  }
   if($kvp =~ m/RSSI=(.*?)(\,|\ ,)/) {
     readingsBulkUpdate($hash, "RSSI", $1);
   }
@@ -579,11 +582,11 @@ sub LaCrosseGateway_HandleOwnSensors($$) {
 
   readingsEndUpdate($hash, 1);
 
-  delete $hash->{READINGS}{"temperature"} if $temperature == undef;
-  delete $hash->{READINGS}{"humidity"} if $humidity == undef;
-  delete $hash->{READINGS}{"pressure"} if $pressure == undef;
-  delete $hash->{READINGS}{"gas"} if $gas == undef;
-  delete $hash->{READINGS}{"debug"} if $debug == undef;
+  delete $hash->{READINGS}{"temperature"} if(!defined($temperature));
+  delete $hash->{READINGS}{"humidity"} if(!defined($humidity));
+  delete $hash->{READINGS}{"pressure"} if(!defined($pressure));
+  delete $hash->{READINGS}{"gas"} if(!defined($gas));
+  delete $hash->{READINGS}{"debug"} if(!defined($debug));
 }
 
 #=======================================================================================

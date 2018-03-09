@@ -26,7 +26,7 @@
 #  GNU General Public License for more details.
 #
 #
-# $Id: 21_HEOSPlayer.pm 14959 2017-08-25 19:36:55Z CoolTux $
+# $Id: 21_HEOSPlayer.pm 15920 2018-01-18 05:13:08Z CoolTux $
 #
 ###############################################################################
 
@@ -39,7 +39,7 @@ use Encode qw(encode_utf8);
 use URI::Escape;
 #use Data::Dumper;
 
-my $version = "1.0.1";
+my $version = "1.0.2";
 
 
 
@@ -712,6 +712,15 @@ sub HEOSPlayer_Set($$@) {
             $heosCmd = 'playQueueItem';
             $action  = "qid=$cid";
 
+        } elsif ( $sid eq "url" ) {
+        
+            #URL abspielen
+            $heosCmd = 'playStream';
+            #$action  = "url=".substr($param,4);
+            $action  = "url=$cid";
+            
+            #getestet mit "set HEOSPlayer_Name input url,http://sender.eldoradio.de:8000/128.mp3"  ich wollte [cid] nicht nutzen da in einer url ja durchaus mehrere Kommata vorkommen können ob das mit dem substr() so toll ich kann ich leider nicht beurteilen. Auch würde ich bei der $sid ein lc($sid) drum machen aber da es nirgendwo ist :-)
+            
         } else {
             if ( $sid > 0 && $sid < 1024 ) {
                 return "usage: $cmd sid,cid,mid" unless( defined($cid) && defined($mid) );

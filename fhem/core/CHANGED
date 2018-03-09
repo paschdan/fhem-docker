@@ -1,5 +1,257 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+  - change:  53_GHoma: plugs with energy measurement implemented
+                      reading energy now in kWh / SetExtensions / DbLog_splitFn
+  - change:  93_DbRep: commandref revised
+  - change:  93_DbLog: V3.8.5, Parse Event for Zwave changed
+  - feature: 00_MQTT: new attribute "client-id"
+  - feature: 93_DbRep: V7.13.0, changeValue may use perlcode {} as "new string"
+  - feature: 93_DbRep: V7.12.0, compression of dumpfile, restore of compressed
+                       files possible
+  - change:  77_SMAEM: V3.1.0, extend error handling in define
+  -bugfix:   73_ElectricityCalculator: Min dt for calc. reduced from 30 to 1 s
+  - feature: 93_DbRep: V7.11.0, "repairSQLite" to repair a corrupted SQLite DB
+  - bugfix:  88_xs1Bridge: code changeover + safety connection check
+  - bugfix:  73_PRESENCE: new collectord .deb package fixing perl warnings
+  - bugfix:  88_HMCCU: fixed CUxD bug and minor bugs
+  - feature: 93_DbRep: V7.10.0, new "changeValue" command, minor fixes
+  - bugfix:  88_xs1Bridge: fix Filelog check
+  - new:     39_Talk2Fhem: new module for language control
+  - feature: 70_BRAVIA: TV input select for all active tuners
+                        Channel selection by channel uri
+                        Optimized fetch of app and input presets
+  - feature: 98_structure: saveStructState/restoreStructState (Forum #84154)
+  - bugfix:  74_XiaomiBTLESens: fix corrupt character for temperature
+  - bugfix:  74_XiaomiBTLESens: fix humidity bug than temperature is lower 10
+  - feature: 88_xs1Bridge: automatic Logfile after define | feature extension
+  - changed: 98_weekprofile: send values for on/off instead of "on"/"off"
+  - feature: 93_DbRep: V7.9.0, new attribute "avgTimeWeightMean" (averageValue)
+                               some code review and corrections
+  - bugfix:  88_xs1Bridge: fix Code
+  - bugfix:  74_XiaomiBTLESens: fix many bugs with ssh connection, fix negativ
+                                temperature bug
+  - feature: 93_DbRep:V7.8.1, new command "eraseReadings", some fixes
+  - bugfix:  93_DbLog:V3.8.4, cover userCommands, avoid crash (forum:#83973)
+  - feature: 51_MOBILEALERTS: Added directionInt for MA10660
+  - changed: 50_MOBILEALERTSGW/51_MOBILEALERTS: Migrate to readingsDelete
+  - new:     98_freezemon: initial check-in 
+  - feature: 74_Unifi: added voucher-functions
+  - change: 30_MilightBridge: Use new RemoveInternalTimer function
+  - new:     52_I2C_EMC1001.pm: initial check in
+  - feature: 30_HUEBridge, 31_HUEDevice: added createGroupReadings attribute
+  - feature: f18: implement dragging / dashboard
+  - change:  93_DbLog: V3.8.3, configCheck improved, execute cache only every
+                       syncInterval/2 if cacheLimit reached, error-handling 
+                       improved
+  - bugfix:  93_DbRep: V7.7.1, minor fix if disabled
+  - feature: 93_DbRep: V7.7.0, attribute "averageCalcForm" - select variant of
+                       averageValue reporting, calc of daily medium temperature 
+                       according german weather service
+  - bugfix:  88_HMCCU: Fixed missing events after get vars command
+                       Fixed state after RPC server start
+  - change:  74_Unifi: SSIDs-Readings and drop-downs use goodReadingName()
+  - feature: 72_FB_CALLLIST: enhanced possibilities to disable a FB_CALLLIST
+                             definition (via attribute "disable")
+                             new attribute processEventsWhileDisabled
+  - feature: 73_PRESENCE: new presenced deb package (ping command, systemd)
+  - feature: 93_DbRep: V7.6.1, data with "|" in value are possible to process,
+                       attr "sqlCmdHistoryLength" to use sqlCmdHistory list,
+                       attr "fetchMarkDuplicates" to highlight multiple data
+  - update:  88_HMCCU: Version 4.2
+  - new:     88_HMCCURPCPROC: Sub process based RPC server for HMCCU.
+  - feature: 73_PRESENCE: new collectord package (RSSI based room selection
+                          for BTLE devices (lepresenced), ping command for
+                          daemon monitoring, systemd service unit)
+  - bugfix:  93_DbLog: use of uninitialized value $txt if addlog has no value
+  - feature: 33_readingsGroup: added german commandref (by HomeAuto_User)
+  - feature: 10_pilight_ctrl: support bh1750 illuminance sensor
+  - feature: 71_YAMAHA_NP: Added player readings support for
+                           airplay and spotify inputs.
+  - change:  93_DbLog:V3.8.0, log events containing pipe "|" possible
+  - bugfix:  98_TRAFFIC: v1.3.5, fixed return readings in DbLog_SplitFn
+  - feature: attr: -a and -r Options added (Forum #83414)
+  - feature: 20_FRM_IN: added Firmata 2.5 feature PIN_MODE_PULLUP
+                        note: requires perl-firmata 0.64
+  - change:  74_Unifi: SSIDs-Readings and drop-downs use goodReadingName()
+  - feature: new module 37_NotifyAndroidTV.pm to send notifications
+             to Notifications for Android TV/Fire TV apps (justme1968)
+  - bugfix:  98_TRAFFIC: v1.3.4, fixed DbLog_SplitFn, misc improvements 
+  - change:  72_FB_CALLMONITOR: reverse search provider klicktel.de is
+                                DEPRECATED and will be removed in a future 
+                                release. please use dasoertliche.de instead.
+                                attribute apiKeyKlicktelDe removed
+  - bugfix:  93_DbLog: V3.7.1, fix typo in commandref
+  - change:  93_DbRep: V7.5.5, minor corrections in delSeqDoublets
+  - change:  72_FB_CALLMONITOR: new attribute apiKeyKlicktelDe and 
+                                apiKeySearchCh to configure own private API keys
+                                for reverse search via klicktel.de or search.ch
+  - feature: 93_DbRep: V7.5.4, dumpFilesKeep can be set to "0", new attribute 
+                       "ftpDumpFilesKeep" for version management on FTP, 
+                       delSeqDoublets optimized for consumption of resources
+  - feature: 98_DOIFtools: blockinginfo added to running timer info
+  - change:  73_PRESENCE: following attributes were renamed:
+                          * ping_count => pingCount
+                          * fritzbox_speed => fritzboxCheckSpeed
+                          * bluetooth_hci_device => bluetoothHciDevice
+                          existing configuration will be converted automatically
+  - bugfix:  74_XiaomiBTLESens: fix error messages
+  - feature: 46_TeslaPowerwall2AC: Powerwalls overwiev
+  - feature: 73_PRESENCE: new set commands overrideInterval and clearOverride
+                          to temporary override the check interval.
+                          new attributes retryCount and retryInterval
+  - feature: 89_FULLY: Added support for attribute disable
+  - change:  93_DbLog: V3.7.0, log verbose 5 enhanced, configuration read check
+                       added to configCheck
+  - feature: 74_Unifi: new Readings for WLAN-states, fixed Warning
+  - feature: 93_DbRep: V7.5.1, new set-options display/writeToDB for 
+                       (max|min|sum|average|diff)Value,
+                       create background_processing_time before execute
+                       commands in attribute "executeAfterProc" (db-dumps)
+  - feature: 10_FRM: new attribute "disable", new states "disabled", 
+                     "defined" and "connected", new attribute "errorExclude",
+                     new reading "stringMessage", new internal "pullup_pins"
+  - bugfix:  74_XiaomiBTLESens: fix Illegal hexadecimal digit ' ' ignored
+  - change:  74_XiaomiBTLESens: better timer logic
+  - feature: 20_FRM_AD: analog resolution now depending on device capability
+  - change:  93_DbLog: V3.6.5, avoid shutdown problem if database is too slow,
+                       extend configCheck with shutdown preparation check,
+                       fix logentries if device disabled and db not available
+  - bugfix:  74_Unifi: fixed blockClient
+  - bugfix:  98_dewpoint.pm: Fix event processing when updating STATE
+  - bugfix:  73_ElectricityCalculator.pm: Spelling error
+  - change:  74_XiaomiBTLESens: Code clean
+  - feature: 21_HEOSPlayer: add input URL as set command
+  - feature: 74_Unifi: add new set command to en-/disable Site Status-LEDs
+  - bugfix:  74_XiaomiBTLESens: fix ssh gatttool which test
+  - new:     74_XiaomiBTLESens: modul replace 74_XiaomiFlowerSens, add Support
+                                for Xiamomi Themometer/Hygrometer mit Display
+  - bugfix:  42_SYSMON: Falsche Angabe von Ram free / used bei Debian Stretch
+  - bugfix:  70_BRAVIA: fixed hash for space
+                        (application, channel, input names)
+  - change:  93_DbLog: change verbose level of addlog from 2 to 4
+  - bugfix:  93_DbRep: old dumpfiles not deleted by dumpMySQL clientSide
+  - bugfix:  70_BRAVIA: typo fixed, 'set application' works now
+  - feature: 93_DbRep: V7.4.0, new commands dumpSQLite/restoreSQLite,
+                       execute commands before/after set optimizeTables, 
+                       vacuum, restoreMySQL, restoreSQLite available,
+                       CAUTION !! attributes executeBeforeDump/executeAfterDump
+                       are renamed to executeBeforeProc/executeAfterProc
+  - feature: 74_Unifi: add new set commands to block/unblock clients,
+                       enable/disable WLAN, new client-Reading essid
+  - feature: structure: implement dynamic members via devspec (Forum #82604)
+  - feature: new module 74_UnifiVideo for UnifiVideo integration (justme1968)
+  - change:  93_DbLog: V3.6.2, new attribute "exportCacheAppend", minor fix in 
+                       Log verbose 5
+  - bugfix:  82_LGTV_WebOS: fix wrong paired reading and more
+  - change:  98_dewpoint: Use NOTIFYDEV
+  - bugfix:  93_DbRep: syntax error if perl version < 5.20
+  - feature: 74_AMADDevice: add new set command "takePicture",change Commandref
+  - feature: 98_GOOGLECAST: support speak command for TTS
+                            set castdevice speak "Hallo"
+  - feature: 51_MOBILEALERTS: Added Sensor WL2000
+  - change:  93_DbRep: V7.3.0, charfilter avoid control characters in datasets
+                       to export, function exportToFile importFromFile improved
+  - feature: FHEMWEB: new style f18
+  - feature: 98_weekprofile.pm: new set command 'reread_master'
+  - change:  10_SOMFY: minor changes remvoe debug and add parsestate reading
+  - bugfix:  74_XiaomiFlowerSens: fix error then use ssh and no connect
+  - change:  72_FB_CALLIST: mapping tables (icon-mapping, external-mapping,...)
+             will be evaluated after initialization is finished (Forum: #81892)
+  - feature: 01_FHEMWEB.pm: -> as room separator (Forum #82151)
+  - bugfix:  10_FRM: accept Firmata firmware without AnalogInputFirmata
+  - bugfix:  10_MYSENSORS_DEVICE: corrected S_LIGHT_LEVEL
+  - bugfix:  93_DbRep: fix "month out of range" that causes fhem crash
+  - feature: 20_FRM_PWM: new attribute "restoreOnStartup"
+  - feature: 20_FRM_OUT: new attributes "activeLow" and "valueMode"
+  - feature: 10_FRM: SerialFirmata support
+  - update:  10_FRM: OWX IODev assignment
+  - update:  10_FRM: Firmata 2.7+ support
+  - bugfix:  98_weekprofile: fix "error restore topic"
+  - change:  14_CUL_TCM97001: Fix Logoutput, Fix device output with 
+             multiple sensors
+  - change:  74_AMADDevice: change DEF and add Attribut IODev, add Reading
+                            incommingSmsText
+  - change:  74_XiaomiFlowerSens: fix Problems with sshHost Methode
+  - change:  73_GardenaSmartBridge/74_GardenaSmartDevice: add NotifyFn Support
+             change AttrFn Routine
+  - feature: 93_DbRep: V7.2.0, new attributes "seqDoubletsVariance", 
+                       "timeYearPeriod", minor fixes
+  - feature: 98_TRAFFIC: v1.3.3, added alternatives, various improvements
+  - feature: 70_BRAVIA: new command "application" to start an application on TV
+  - feature: FHEMWEB: add structure to roomnames (Forum #63530)
+  - feature: 98_dewpoint: Generated readings are now subject to standard
+                       processing.
+                       ! Be sure to add readings to event-on- .... attributes
+                       ! if you want events to be generated !
+  - feature: 93_DbLog: V3.6.0, check global blockingCallMax in configCheck, 
+                       configCheck available also for SQLITE now
+  - feature: 10_SOMFY: internal rework / prep for Alex / position command
+  - feature: 70_BRAVIA: new command "text" to add text to an input field
+  - changed: allowed.pm/fhem.pl: SecurityCheck cleanup, Forum #81509
+  - new:     88_xs1Bridge: New modul to read xs1 EZcontrol
+  - change:  93_DbRep: V7.0.0, changelog:
+                       - faster exec if no time attribut/aggregation is set
+                       - bugfix in fetchrows if data contain chars like "'
+                       - new command get blockinginfo
+                       - identify if reopen is running on assigned dblog-device
+                       - bugfix in delSeqDoublets
+                       - internal code changes/reviews
+  - feature: 50_TelegramBot: new set cmd silentmsg to disable_notification
+  - bugfix:  73_GardenaSmart: v0.4.0 bugfixes
+  - feature: 31_PLAYBULB: v1.4.0 support for Sphere Model BTL301w
+  - change:  77_UWZ: v2.0.0, replace Iconv-Converter with perl encode()
+  - change:  93_DbLog: V3.4.0, importCacheFile, addCacheLine use char filter
+                       (switch it on with attribute useCharfilter)
+  - feature: 98_GOOGLECAST: support displaying websites on Chromecast
+                            pychromecast > 1.0.0 needed
+                            support skip/rewind
+  - feature: 10_EQ3BT: support maxRetries and timeout attribute
+  - bugfix:  98_DLNARenderer: fix renew subscription warnings
+  - feature: 98_BOSEST: support Audio Notification API for TTS
+                        no more minidlna installation needed
+                        only supported for up to 100 characters
+  - new:     97_PiXtendV2: New module to control a PiXtend V2 -S- board
+  - change:  93_DbLog: V3.4.0, avoid output RUNNING_PID + args by "list device"
+  - new:     50_MOBILEALERTSGW/51_MOBILEALERTS: New moduls for MobileAlerts
+  - change:  93_DbRep: V6.4.2, changelist:
+                       - prepare for usage of datetime picker widget
+                       - new attr "sqlResultFieldSep" (field separator)
+                       - change "delSeqDoublets" to respect attribute "limit"
+                       - bug fix in "delSeqDoublets delete" function
+  - change:  93_DbLog: V3.3.0 ,changelist to last version 2.2.15:
+                       - enhanced log output of reduceLog,reduceLogNbl
+                       - new command addCacheLine,add data to cache immediately
+                       - new attr "useCharfilter"
+                       - new attr "commitMode", see commandref
+                       - avoid print out the content of cache by "list device"
+                       - minor fixes
+  - feature: 99_weekprofile: add support for CCU2 (experimental)
+  - change:  93_DbRep: V6.3.2 ,changelist to last version:
+                       - new command delSeqDoublets
+                       - add last command option to internal LASTCMD
+                       - add format d:xx h:xx m:xx s:xx for attributes
+                         timeDiffToNow, timeOlderThan
+                       - new attribute fetchRoute to switch asc,desc datafetch
+  - change:  HttpUtils: compression activated
+             disable it with attr global httpcompress 0
+  - bugfix:  46_SmartPi: fix syntax error bug in Attribut Sub
+  - change:  98_dewpoint: Refactoring using API calls, verbose attribute added
+  - change:  FileLog removes newlines from the data (Forum #79684)
+  - bugfix:  98_Siro.pm: Support favorit for model ERB15LE
+  - feature: notify/FileLog: add ignoreRegexp attribute (Forum #79684)
+  - feature: 46_SmartPi: add decimal Attr, fix Notify bug
+  - bugfix:  74_XiaomiFlowerSens: fix many Notify bugs
+  - change:  backup is always started in the background (Forum #80237)
+  - bugfix:  72_FB_CALLMONITOR: fix not working reverse-search-phonebook 
+             file import
+  - change:  93_DbLog: V2.22.15, some Log verbose level adapted/added
+  - bugfix:  44_S7_ARead: event-on-change-reading
+  - bugfix:  44_S7_AWrite: event-on-change-reading
+  - bugfix:  44_S7_DRead: event-on-change-reading
+  - bugfix:  44_S7_DWrite: event-on-change-reading
+  - bugfix:  44_S7_S5Client.pm: loading serial modul
+  - change:  89_FULLY: on-timer implemented
+  - change:  77_SMAEM: V3.0.1, use abort cause of BlockingCall
   - change:  93_Log2Syslog: V3.2.0, add NOTIFYDEV (if possible)
   - change:  70_BRAVIA: set remoteControl supports command codes
   - change:  98_dewpoint: Consolidated and corrected formulas for dewpoint

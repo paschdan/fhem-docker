@@ -1,4 +1,4 @@
-# $Id: 34_ESPEasy.pm 14936 2017-08-21 04:12:53Z dev0 $
+# $Id: 34_ESPEasy.pm 16184 2018-02-15 08:02:48Z dev0 $
 ################################################################################
 #
 #  34_ESPEasy.pm is a FHEM Perl module to control ESP8266 /w ESPEasy
@@ -36,7 +36,7 @@ use Color;
 # ------------------------------------------------------------------------------
 # global/default values
 # ------------------------------------------------------------------------------
-my $module_version    = "1.33";     # Version of this module
+my $module_version    = "1.36";     # Version of this module
 my $minEEBuild        = 128;        # informational
 my $minJsonVersion    = 1.02;       # checked in received data
 
@@ -71,10 +71,13 @@ my %ESPEasy_setCmds = (
   "pwmfade"        => "3",
   "pulse"          => "3",
   "longpulse"      => "3",
+  "longpulse_ms"   => "3",
   "servo"          => "3",
   "lcd"            => "3",
   "lcdcmd"         => "1",
   "mcpgpio"        => "2",
+  "mcppulse"       => "3", # forum 82174
+  "mcplongpulse"   => "3", # forum 82174
   "oled"           => "3",
   "oledcmd"        => "1",
   "pcapwm"         => "2",
@@ -122,10 +125,13 @@ my %ESPEasy_setCmdsUsage = (
   "pwm"            => "pwm <pin> <level>",
   "pulse"          => "pulse <pin> <0|1|off|on> <duration>",
   "longpulse"      => "longpulse <pin> <0|1|off|on> <duration>",
+  "longpulse_ms"   => "longpulse_ms <pin> <0|1|off|on> <duration>",
   "servo"          => "servo <servoNo> <pin> <position>",
   "lcd"            => "lcd <row> <col> <text>",
   "lcdcmd"         => "lcdcmd <on|off|clear>",
-  "mcpgpio"        => "mcpgpio <pin> <0|1|off|on>",
+  "mcpgpio"        => "mcpgpio <port> <0|1|off|on>",
+  "mcppulse"       => "mcppulse <port> <0|1|off|on> <duration>",     # forum 82174
+  "mcplongpulse"   => "mcplongpulse <port> <0|1|off|on> <duration>", # forum 82174
   "oled"           => "oled <row> <col> <text>",
   "oledcmd"        => "oledcmd <on|off|clear>",
   "pcapwm"         => "pcapwm <pin> <Level>",
@@ -760,9 +766,19 @@ sub ESPEasy_Read($) {
       return;
     }
 
-    my $ident = ESPEasy_isCombineDevices($peer,$espName,AttrVal($bname,"combineDevices",0))
+    my $cd = ESPEasy_isCombineDevices($peer,$espName,AttrVal($bname,"combineDevices",0));
+    my $ident = $cd
       ? $espName ne "" ? $espName : $peer
       : $espName.($espName ne "" && $espDevName ne "" ? "_" : "").$espDevName;
+
+    my $d0;
+    Log3 $bname, 4, "$btype $name: Src:'$json->{data}{ESP}{name}'/'"
+                  . "$json->{data}{SENSOR}{0}{deviceName}' => ident:$ident "
+                  . "dev:"
+                  . ( ($d0=(devspec2array("i:IDENT=$ident:FILTER=i:TYPE=$btype"))[0])
+                       ? $d0 
+                       : "undef" )
+                  . " combinedDevice:".$cd;
 
     # push internals in @values
     my @values;
@@ -1155,7 +1171,7 @@ sub ESPEasy_dispatch($$$@) #called by bridge -> send to logical devices
   my $ac = (AttrVal($bname,"autocreate",AttrVal("global","autoload_undefined_devices",1))) ? 1 : 0;
   my $msg = $ident."::".$host."::".$ac."::".$as."::".$ui."::".join("|||",@values);
 
-  Log3 $bname, 5, "$type $name: Dispatch: $msg";
+#  Log3 $bname, 5, "$type $name: Dispatch: $msg";
   Dispatch($bhash, $msg, undef);
 
   return undef;
@@ -2764,7 +2780,7 @@ sub ESPEasy_removeGit($)
     </li>
   </ul>
 
-  <h3>ESPEasy Bridge</h3>
+  <h4>ESPEasy Bridge</h4>
 
   <a name="ESPEasy_bridge_define"></a>
   <b>Define </b>(bridge)<br><br>
@@ -2973,7 +2989,7 @@ sub ESPEasy_removeGit($)
       </li><br>
   </ul>
 
-  <h3>ESPEasy Device</h3>
+  <h4>ESPEasy Device</h4>
 
   <a name="ESPEasy_device_define"></a>
   <b>Define </b>(logical device)<br><br>
@@ -3142,10 +3158,18 @@ sub ESPEasy_removeGit($)
     </li><br>
 
     <li><a name="ESPEasy_device_set_logpulse">LongPulse</a><br>
-      Direct pulse control of output pins<br>
+      Direct pulse control of output pins (duration in s)<br>
       <ul>
         <li>arguments: <code>&lt;pin&gt; &lt;0|1|off|on&gt; &lt;duration&gt;</code></li>
         <li>example: <code>set &lt;esp&gt; longpulse 14 on 10</code></li>
+      </ul>
+    </li><br>
+
+    <li><a name="ESPEasy_device_set_logpulse_ms">LongPulse_ms</a><br>
+      Direct pulse control of output pins (duration in ms)<br>
+      <ul>
+        <li>arguments: <code>&lt;pin&gt; &lt;0|1|off|on&gt; &lt;duration&gt;</code></li>
+        <li>example: <code>set &lt;esp&gt; longpulse_ms 14 on 10000</code></li>
       </ul>
     </li><br>
 
@@ -3182,15 +3206,31 @@ sub ESPEasy_removeGit($)
 			ESPEasy Wiki PCF8574</a>
     </li><br>
 
-    <li><a name="ESPEasy_device_set_mcpgpio">mcpgpio</a><br>
+    <li><a name="ESPEasy_device_set_mcpgpio">MCPGPIO</a><br>
       Control MCP23017 output pins (16-Bit I/O Expander with Serial Interface)<br>
 			<ul>
         <li>arguments: <code>&lt;port&gt; &lt;0|1|off|on&gt;</code></li>
-        <li>example: <code>set &lt;esp&gt; mcpgpio 48 on</code></li>
+        <li>example: <code>set &lt;esp&gt; MCPGPIO 48 on</code></li>
       </ul>
 			Port numbering see:
 			<a href="https://www.letscontrolit.com/wiki/index.php/MCP23017#Input">
 			ESPEasy Wiki MCP23017</a>
+    </li><br>
+
+    <li><a name="ESPEasy_device_set_mcppulse">MCPPulse</a><br>
+      Pulse control on MCP23017 output pins (duration in ms)<br>
+			<ul>
+        <li>arguments: <code>&lt;port&gt; &lt;0|1|off|on&gt; &lt;duration&gt;</code></li>
+        <li>example: <code>set &lt;esp&gt; MCPPulse 48 on 100</code></li>
+      </ul>
+    </li><br>
+
+    <li><a name="ESPEasy_device_set_mcplongpulse">MCPLongPulse</a><br>
+      Longpulse control on MCP23017 output pins (duration in s)<br>
+			<ul>
+        <li>arguments: <code>&lt;port&gt; &lt;0|1|off|on&gt; &lt;duration&gt;</code></li>
+        <li>example: <code>set &lt;esp&gt; MCPLongPulse 48 on 2</code></li>
+      </ul>
     </li><br>
 
     <li><a name="ESPEasy_device_set_pcapwm">pcapwm</a><br>

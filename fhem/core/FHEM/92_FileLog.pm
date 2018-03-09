@@ -1,5 +1,5 @@
 ##############################################
-# $Id: 92_FileLog.pm 14888 2017-08-13 12:07:12Z rudolfkoenig $
+# $Id: 92_FileLog.pm 15874 2018-01-13 17:16:33Z rudolfkoenig $
 package main;
 
 use strict;
@@ -49,6 +49,7 @@ FileLog_Initialize($)
     disable:0,1
     disabledForIntervals
     eventOnThreshold
+    ignoreRegexp
     logtype
     mseclog:1,0
     nrarchive
@@ -181,6 +182,7 @@ FileLog_Log($$)
 
   my $n = $dev->{NAME};
   my $re = $log->{REGEXP};
+  my $iRe = AttrVal($ln, "ignoreRegexp", undef);
   my $max = int(@{$events});
   my $tn = $dev->{NTFY_TRIGGERTIME};
   if($log->{mseclog}) {
@@ -197,6 +199,7 @@ FileLog_Log($$)
     $s = "" if(!defined($s));
     my $t = (($ct && $ct->[$i]) ? $ct->[$i] : $tn);
     if($n =~ m/^$re$/ || "$n:$s" =~ m/^$re$/ || "$t:$n:$s" =~ m/^$re$/) {
+      next if($iRe && ($n =~ m/^$iRe$/ || "$n:$s" =~ m/^$iRe$/));
       $t =~ s/ /_/; # Makes it easier to parse with gnuplot
 
       if(!$switched) {
@@ -204,6 +207,7 @@ FileLog_Log($$)
         $switched = 1;
       }
       $fh = $log->{FH};
+      $s =~ s/\n/ /g;
       print $fh "$t $n $s\n";
       $written++;
     }
@@ -238,6 +242,12 @@ FileLog_Attr(@)
     return;
   }
 
+  if($a[0] eq "set" && $a[2] eq "ignoreRegexp") {
+    return "Missing argument for ignoreRegexp" if(!defined($a[3]));
+    eval { "HALLO" =~ m/$a[3]/ };
+    return $@;
+  }
+
   if($a[0] eq "set" && $a[2] eq "disable") {
     $do = (!defined($a[3]) || $a[3]) ? 1 : 2;
   }
@@ -265,6 +275,8 @@ FileLog_Set($@)
     my $r = "Unknown argument $cmd, choose one of ".join(" ",sort keys %sets);
     my $fllist = join(",", grep { $me ne $_ } devspec2array("TYPE=FileLog"));
     $r =~ s/absorb/absorb:$fllist/;
+    $r =~ s/clear/clear:noArg/;
+    $r =~ s/reopen/reopen:noArg/;
     return $r;
   }
   return "$cmd needs $sets{$cmd} parameter(s)" if(@a-$sets{$cmd} != 2);
@@ -579,8 +591,8 @@ FileLog_Get($@)
   
   return "Usage: get $a[0] <infile> <outfile> <from> <to> [<column_spec>...]\n".
          "  where column_spec is <col>:<regexp>:<default>:<fn>\n" .
-         "  see the FileLogGrep entries in he .gplot files\n" .
-         "  <infile> is without direcory, - means the current file\n" .
+         "  see the FileLogGet entries in the .gplot files\n" .
+         "  <infile> is without directory, - means the current file\n" .
          "  <outfile> is a prefix, - means stdout\n"
         if(int(@a) < 4);
   shift @a;
@@ -1305,6 +1317,8 @@ FileLog_regexpFn($$)
         feature was implemented. A FHEM crash or kill will falsify the counter.
         </li><br>
 
+    <li><a href="#ignoreRegexp">ignoreRegexp</a></li>
+
     <a name="logtype"></a>
     <li>logtype<br>
         Used by the pgm2 webfrontend to offer gnuplot/SVG images made from the
@@ -1625,6 +1639,8 @@ FileLog_regexpFn($$)
         Features angelegt wurden. Ein Absturz/Abschu&szlig; von FHEM
         verf&auml;lscht die Z&auml;hlung.
         </li><br>
+
+    <li><a href="#ignoreRegexp">ignoreRegexp</a></li>
 
     <a name="logtype"></a>
     <li>logtype<br>

@@ -1,4 +1,4 @@
-# $Id: 73_ElectricityCalculator.pm 14219 2017-05-08 10:54:54Z Sailor $
+# $Id: 73_ElectricityCalculator.pm 16192 2018-02-16 18:30:13Z Sailor $
 ########################################################################################################################
 #
 #     73_ElectricityCalculator.pm
@@ -148,7 +148,7 @@ sub ElectricityCalculator_Attr(@)
 		}
 		elsif ($a[3] eq 1)		
 		{	
-			$hash->{STATE} = "diabled";
+			$hash->{STATE} = "disabled";
 		}
 	}
 	
@@ -689,8 +689,8 @@ sub ElectricityCalculator_Notify($$)
 		my $ElectricityCountReadingTimestampDelta = $ElectricityCountReadingTimestampCurrentRelative - $ElectricityCountReadingTimestampPreviousRelative;
 		Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator - ElectricityCountReadingTimestampDelta            : " . $ElectricityCountReadingTimestampDelta . " s";
 
-		### Continue with calculations only if time difference is larger than 30 seconds to avoid "Illegal division by zero" and erroneous due to small values for divisor
-		if ($ElectricityCountReadingTimestampDelta > 30)
+		### Continue with calculations only if time difference is larger than 1 seconds to avoid "Illegal division by zero" and erroneous due to small values for divisor
+		if ($ElectricityCountReadingTimestampDelta > 1)
 		{
 			### Calculate DW (electric Energy difference) of previous and current value / [kWh]
 			my $ElectricityCountReadingValueDelta = sprintf('%.3f', ($ElectricityCountReadingValueCurrent - $ElectricityCountReadingValuePrevious));

@@ -1,5 +1,5 @@
 
-# $Id: 31_HUEDevice.pm 15247 2017-10-13 19:18:21Z justme1968 $
+# $Id: 31_HUEDevice.pm 16091 2018-02-05 12:38:36Z justme1968 $
 
 # "Hue Personal Wireless Lighting" is a trademark owned by Koninklijke Philips Electronics N.V.,
 # see www.meethue.com for more information.
@@ -165,7 +165,6 @@ sub HUEDevice_Initialize($)
   $hash->{GetFn}    = "HUEDevice_Get";
   $hash->{AttrFn}   = "HUEDevice_Attr";
   $hash->{AttrList} = "IODev ".
-                      "createActionReadings:1,0 ".
                       "delayedUpdate:1 ".
                       "ignoreReachable:1,0 ".
                       "realtimePicker:1,0 ".
@@ -194,6 +193,24 @@ HUEDevice_devStateIcon($)
   my $name = $hash->{NAME};
 
   if( $hash->{helper}->{devtype} && $hash->{helper}->{devtype} eq 'G' ) {
+    if( $hash->{IODev} ) {
+      my $createGroupReadings = AttrVal($hash->{IODev}{NAME},"createGroupReadings",undef);
+      if( defined($createGroupReadings) ) {
+        return undef if( $createGroupReadings && !AttrVal($hash->{NAME},"createGroupReadings", 1) );
+        return undef if( !$createGroupReadings && !AttrVal($hash->{NAME},"createGroupReadings", undef) );
+
+        return ".*:light_question:toggle" if( !$hash->{helper}{reachable} );
+
+        return ".*:off:toggle" if( ReadingsVal($name,"onoff","0") eq "0" );
+
+        my $pct = ReadingsVal($name,"pct","100");
+        my $s = $dim_values{int($pct/7)};
+        $s="on" if( $pct eq "100" );
+
+        return ".*:$s:toggle";
+      }
+    }
+
     #return ".*:off:toggle" if( !ReadingsVal($name,'any_on',0) );
     #return ".*:on:toggle" if( ReadingsVal($name,'any_on',0) );
 
@@ -336,6 +353,9 @@ sub HUEDevice_Define($$)
 
     my $icon_path = AttrVal("WEB", "iconPath", "default:fhemSVG:openautomation" );
     $attr{$name}{'color-icons'} = 2 if( !defined( $attr{$name}{'color-icons'} ) && $icon_path =~ m/openautomation/ );
+
+    addToDevAttrList($name, "createActionReadings:1,0");
+    addToDevAttrList($name, "createGroupReadings:1,0");
 
   } elsif( $hash->{helper}->{devtype} eq 'S' ) {
     $hash->{DEF} = "sensor $id $args[3] IODev=$iodev" if( $iodev );
@@ -721,6 +741,7 @@ HUEDevice_Set($@)
   }
 
   if( (my $joined = join(" ", @aa)) =~ /:/ ) {
+    $joined =~ s/on-till\s+[^\s]+//g; #bad workaround for: https://forum.fhem.de/index.php/topic,61636.msg728557.html#msg728557
     my @cmds = split(":", $joined);
     for( my $i = 0; $i <= $#cmds; ++$i ) {
       HUEDevice_SetParam($name, \%obj, split(" ", $cmds[$i]) );
@@ -982,29 +1003,15 @@ sub
 HUEDevice_ReadFromServer($@)
 {
   my ($hash,@a) = @_;
-
   my $name = $hash->{NAME};
+
+  #return if(IsDummy($name) || IsIgnored($name));
+
   no strict "refs";
   my $ret;
   unshift(@a,$name);
   #$ret = IOWrite($hash, @a);
   $ret = IOWrite($hash,$hash,@a);
-  use strict "refs";
-  return $ret;
-  return if(IsDummy($name) || IsIgnored($name));
-  my $iohash = $hash->{IODev};
-  if(!$iohash ||
-     !$iohash->{TYPE} ||
-     !$modules{$iohash->{TYPE}} ||
-     !$modules{$iohash->{TYPE}}{ReadFn}) {
-    Log3 $name, 5, "No I/O device or ReadFn found for $name";
-    return;
-  }
-
-  no strict "refs";
-  #my $ret;
-  unshift(@a,$name);
-  $ret = &{$modules{$iohash->{TYPE}}{ReadFn}}($iohash, @a);
   use strict "refs";
   return $ret;
 }
@@ -1041,7 +1048,7 @@ HUEDevice_GetUpdate($)
   my $result = HUEDevice_ReadFromServer($hash,$hash->{ID});
   if( !defined($result) ) {
     $hash->{helper}{reachable} = 0;
-    $hash->{STATE} = "unknown";
+    #$hash->{STATE} = "unknown";
     return;
   } elsif( $result->{'error'} ) {
     $hash->{helper}{reachable} = 0;
@@ -1050,6 +1057,7 @@ HUEDevice_GetUpdate($)
   }
 
   HUEDevice_Parse($hash,$result);
+  HUEBridge_updateGroups($hash->{IODev}, $hash->{ID}) if( $hash->{IODev}{TYPE} eq 'HUEBridge' );
 }
 
 sub
@@ -1103,7 +1111,7 @@ HUEDevice_Parse($$)
 
   if( $hash->{helper}->{devtype} eq 'G' ) {
     if( $result->{lights} ) {
-      $hash->{lights} = join( ",", @{$result->{lights}} );
+      $hash->{lights} = join( ",", sort { $a <=> $b } @{$result->{lights}} );
     } else {
       $hash->{lights} = '';
     }
@@ -1204,6 +1212,9 @@ HUEDevice_Parse($$)
       $hash->{sunriseoffset} = $config->{sunriseoffset} if( defined($config->{sunriseoffset}) );
       $hash->{sunsetoffset} = $config->{sunsetoffset} if( defined($config->{sunsetoffset}) );
 
+      $hash->{tholddark} = $config->{tholddark} if( defined($config->{tholddark}) );
+      $hash->{sensitivity} = $config->{sensitivity} if( defined($config->{sensitivity}) );
+
       $readings{battery} = $config->{battery} if( defined($config->{battery}) );
       $readings{reachable} = $config->{reachable} if( defined($config->{reachable}) );
     }
@@ -1249,6 +1260,7 @@ HUEDevice_Parse($$)
       $readings{humidity} = $state->{humidity} * 0.01 if( defined($state->{humidity}) );
       $readings{daylight} = $state->{daylight}?'1':'0' if( defined($state->{daylight}) );
       $readings{temperature} = $state->{temperature} * 0.01 if( defined($state->{temperature}) );
+      $readings{pressure} = $state->{pressure} if( defined($state->{pressure}) );
     }
 
     if( scalar keys %readings ) {
@@ -1559,13 +1571,13 @@ HUEDevice_Attr($$$;$)
       <li>dimUp [delta]</li>
       <li>dimDown [delta]</li>
       <li>ct &lt;value&gt; [&lt;ramp-time&gt;]<br>
-        set colortemperature to &lt;value&gt; in mireds (range is 154-500) or kelvin (rankge is 2000-6493).</li>
+        set colortemperature to &lt;value&gt; in mireds (range is 154-500) or kelvin (range is 2000-6493).</li>
       <li>ctUp [delta]</li>
       <li>ctDown [delta]</li>
       <li>hue &lt;value&gt; [&lt;ramp-time&gt;]<br>
         set hue to &lt;value&gt;; range is 0-65535.</li>
-      <li>humUp [delta]</li>
-      <li>humDown [delta]</li>
+      <li>hueUp [delta]</li>
+      <li>hueDown [delta]</li>
       <li>sat &lt;value&gt; [&lt;ramp-time&gt;]<br>
         set saturation to &lt;value&gt;; range is 0-254.</li>
       <li>satUp [delta]</li>
@@ -1621,6 +1633,8 @@ HUEDevice_Attr($$$;$)
       2 -> use lamp color scaled to full brightness as icon color and dim state as icon shape</li>
     <li>createActionReadings<br>
       create readings for the last action in group devices</li>
+    <li>createGroupReadings<br>
+      create 'artificial' readings for group devices. default depends on the createGroupReadings setting in the bridge device.</li>
     <li>ignoreReachable<br>
       ignore the reachable state that is reported by the hue bridge. assume the device is allways reachable.</li>
     <li>setList<br>

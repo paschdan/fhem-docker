@@ -2,11 +2,11 @@
 /**
  * UI builder framework for FHEM
  *
- * Version: 2.6.32
+ * Version: 2.6.40
  *
  * Copyright (c) 2015-2017 Mario Stephan <mstephan@shared-files.de>
  * Under MIT License (http://www.opensource.org/licenses/mit-license.php)
- *
+ * https://github.com/knowthelist/fhem-tablet-ui
  */
 
 /* global Framework7:true, jQuery:true, Dom7:true */
@@ -109,8 +109,8 @@ var Modul_widget = function () {
             if ($.isArray(subst)) {
                 for (var i = 0, len = subst.length; i < len; i += 2) {
                     if (i + 1 < len) {
-                        value=value.replace(new RegExp(String(subst[i]) , "g"),String(subst[i+1]));
-                   }
+                        value = value.replace(new RegExp(String(subst[i]), "g"), String(subst[i + 1]));
+                    }
                 }
             } else if (subst.match(/^s/)) {
                 var f = subst.substr(1, 1);
@@ -145,8 +145,17 @@ var Modul_widget = function () {
         elem.initData('get', 'STATE');
         elem.initData('set', '');
         elem.initData('cmd', 'set');
+        elem.initData('get-on', '(true|1|on|open|ON)');
+        elem.initData('get-off', '(false|0|off|closed|OFF)');
 
         me.addReading(elem, 'get');
+        if (elem.isDeviceReading('get-on')) {
+            me.addReading(elem, 'get-on');
+        }
+        if (elem.isDeviceReading('get-off')) {
+            me.addReading(elem, 'get-off');
+        }
+
 
         // reachable parameter
         elem.initData('reachable-on', '!off');
@@ -178,12 +187,14 @@ var Modul_widget = function () {
         elem.text(me.widgetname);
     }
 
+    function reinit() {}
 
     function init() {
         ftui.log(1, "init widget: name=" + me.widgetname + " area=" + me.area);
-        me.elements = $('[data-type="' + me.widgetname + '"]', me.area);
+        me.elements = $('[data-type="' + me.widgetname + '"]:not([data-ready])', me.area);
         me.elements.each(function (index) {
             var elem = $(this);
+            elem.attr("data-ready", "");
             me.init_attr(elem);
             elem = me.init_ui(elem);
         });
@@ -191,7 +202,9 @@ var Modul_widget = function () {
 
     function addReading(elem, key) {
         var data = elem.data(key);
+
         if (ftui.isValid(data)) {
+
             if ($.isArray(data) || !data.toString().match(/^[#\.\[][^:]*$/)) {
                 var device = elem.data('device');
                 if (!$.isArray(data)) {
@@ -206,6 +219,7 @@ var Modul_widget = function () {
                         reading = fqreading[1].replace(']', '');
                     }
                     // fill objects for mapping from FHEMWEB paramid to device + reading
+
                     if (ftui.isValid(device) && ftui.isValid(reading) &&
                         device !== '' && reading !== '' &&
                         device !== ' ' && reading !== ' ') {
@@ -228,6 +242,7 @@ var Modul_widget = function () {
         widgetname: 'widget',
         area: '',
         init: init,
+        reinit: reinit,
         init_attr: init_attr,
         init_ui: init_ui,
         update: update,
@@ -303,8 +318,17 @@ var plugins = {
     },
 
     load: function (name, area) {
-        ftui.log(1, 'Load widget : ' + name);
+        ftui.log(1, 'Load plugin "' + name + '" for area "' + area + '"');
         return ftui.loadPlugin(name, area);
+    },
+
+    reinit: function () {
+        $.each(this.modules, function (index, module) {
+            //Iterate each module and run update function if module is available
+            if (typeof module === 'object') {
+                module.reinit();
+            }
+        });
     },
 
     update: function (dev, par) {
@@ -326,7 +350,7 @@ var plugins = {
 
 var ftui = {
 
-    version: '2.6.32',
+    version: '2.6.40',
     config: {
         DEBUG: false,
         DEMO: false,
@@ -367,6 +391,7 @@ var ftui = {
     timestampMap: {},
     subscriptions: {},
     subscriptionTs: {},
+    scripts: [],
     gridster: {
         instances: {},
         instance: null,
@@ -403,12 +428,16 @@ var ftui = {
         var url = window.location.pathname;
         ftui.config.filename = url.substring(url.lastIndexOf('/') + 1);
         ftui.log(1, 'Filename: ' + ftui.config.filename);
-        ftui.config.fhemDir = $("meta[name='fhemweb_url']").attr("content") || location.origin + "/fhem/";
+        var fhemUrl = $("meta[name='fhemweb_url']").attr("content");
+        ftui.config.fhemDir = fhemUrl || location.origin + "/fhem/";
+        if (fhemUrl && new RegExp("^((?!http:\/\/|https:\/\/).)*$").test(fhemUrl)) {
+            ftui.config.fhemDir = location.origin + "/" + fhemUrl + "/";
+        }
         ftui.config.fhemDir = ftui.config.fhemDir.replace('///', '//');
         ftui.log(1, 'FHEM dir: ' + ftui.config.fhemDir);
         // lang
         var userLang = navigator.language || navigator.userLanguage;
-        ftui.config.lang = $("meta[name='lang']").attr("content") || (ftui.isValid(userLang)) ? userLang.split('-')[0] : 'de';
+        ftui.config.lang = $("meta[name='lang']").attr("content") || ((ftui.isValid(userLang)) ? userLang.split('-')[0] : 'de');
         // credentials
         ftui.config.username = $("meta[name='username']").attr("content");
         ftui.config.password = $("meta[name='password']").attr("content");
@@ -513,6 +542,7 @@ var ftui = {
 
             $(
                 '.gridster li > header ~ .hbox:only-of-type, ' +
+                '.dialog > header ~ .hbox:first-of-type:nth-last-of-type(1), ' +
                 '.gridster li > header ~ .center:not([data-type]):only-of-type, ' +
                 '.card > header ~ div:not([data-type]):only-of-type, ' +
                 '.gridster li header ~ div:first-of-type:nth-last-of-type(1)'
@@ -633,15 +663,15 @@ var ftui = {
                 }
             }
             // corrections for gridster in gridster element
-            var gridgrid = $('.gridster > ul > li:has(* .gridster)');
-            if (gridgrid.length > 0) {
+            $('.gridster > ul > li:has(* .gridster)').each(function () {
+                var gridgrid = $(this);
                 gridgrid.css({
                     'background-color': 'transparent',
                     'margin': '-' + ftui.gridster.margins + 'px',
-                    'width': gridgrid.parent().width() - gridgrid.position().left,
-                    'height': '100%'
+                    //                    'width': gridgrid.parent().width() - gridgrid.position().left,
+                    //                    'height': '100%'
                 });
-            }
+            });
 
             $('.gridster > ul > li >.center', area).parent().addClass('has_center');
             // max height for inner boxes
@@ -710,7 +740,6 @@ var ftui = {
             ftui.initWidgets(area);
             ftui.log(1, 'init templates - Done');
         });
-
     },
 
     initWidgets: function (area) {
@@ -723,9 +752,8 @@ var ftui = {
         ftui.log(2, 'initWidgets - area=' + area);
 
         //collect required widgets types
-        $('[data-type]', area).each(function (index) {
+        $('[data-type] ', area).each(function (index) {
             var type = $(this).data("type");
-            //console.log('type:' + type);
             if (types.indexOf(type) < 0) {
                 types.push(type);
             }
@@ -859,9 +887,10 @@ var ftui = {
                         var newParam = section[reading];
                         if (typeof newParam !== 'object') {
                             //ftui.log(5,'newParam='+newParam);
+
                             newParam = {
                                 "Value": newParam,
-                                "Time": ''
+                                "Time": ""
                             };
                         }
 
@@ -869,7 +898,7 @@ var ftui = {
                         if (ftui.subscriptions[paramid]) {
                             var oldParam = ftui.getDeviceParameter(device, reading);
                             isUpdated = (!oldParam || oldParam.val !== newParam.Value || oldParam.date !== newParam.Time);
-                            //ftui.log(5,'isUpdated='+isUpdated);
+                            ftui.log(5, 'isUpdated=' + isUpdated);
                         }
                         //write into internal cache object
                         var params = ftui.deviceStates[device] || {};
@@ -922,6 +951,7 @@ var ftui = {
                     }
                     ftui.log(1, 'shortPoll - Done');
                     ftui.states.lastShortpoll = ltime;
+                    ftui.poll.shortPollDuration = duration * 1000;
                     ftui.poll.lastShortpollTimestamp = new Date();
                     ftui.saveStatesLocal();
                     ftui.updateBindElements('ftui.');
@@ -1142,8 +1172,9 @@ var ftui = {
                     var subscription = ftui.subscriptions[dataJSON[0]];
                     // update for a parameter
                     if (pmap) {
-                        if (isSTATE)
+                        if (isSTATE) {
                             pmap.reading = 'STATE';
+                        }
                         params = ftui.deviceStates[pmap.device] || {};
                         param = params[pmap.reading] || {};
                         param.val = dataJSON[1];
@@ -1239,7 +1270,7 @@ var ftui = {
     loadStyleSchema: function () {
 
         $.each($('link[href$="-ui.css"],link[href$="-ui.min.css"]'), function (index, thisSheet) {
-            if (!thisSheet || !thisSheet.sheet || !thisSheet.sheet.cssRules) return;
+            if (!thisSheet || !thisSheet.sheet || !thisSheet.sheet.cssRules || thisSheet.getAttribute('disabled')) return;
             var rules = thisSheet.sheet.cssRules;
             for (var r in rules) {
                 if (rules[r].style) {
@@ -1319,6 +1350,7 @@ var ftui = {
     },
 
     readStatesLocal: function () {
+        ftui.poll.shortPollDuration = localStorage.getItem('shortPollDuration') || 1000;
         if (!ftui.config.DEMO)
             ftui.deviceStates = JSON.parse(localStorage.getItem('deviceStates')) || {};
         else {
@@ -1351,7 +1383,7 @@ var ftui = {
     loadPlugin: function (name, area) {
 
         var deferredLoad = new $.Deferred();
-        ftui.log(2, 'Create widget : ' + name);
+        ftui.log(2, 'Start load plugin "' + name + '" for area "' + area + '"');
 
         // get the plugin
         ftui.dynamicload(ftui.config.basedir + "js/widget_" + name + ".js", true).done(function () {
@@ -1367,10 +1399,10 @@ var ftui = {
                     if (deps) {
                         deps = ($.isArray(deps)) ? deps : [deps];
                         $.map(deps, function (dep, i) {
-                            if (dep.indexOf(".js") < 0) {
-                                depsPromises.push(ftui.loadPlugin(dep));
-                            } else {
+                            if (dep.match(new RegExp('^.*\.(js|css)$'))) {
                                 depsPromises.push(ftui.dynamicload(dep, false));
+                            } else {
+                                depsPromises.push(ftui.loadPlugin(dep));
                             }
                         });
                     }
@@ -1396,11 +1428,11 @@ var ftui = {
                                 module.update(module.subscriptions[key].device, module.subscriptions[key].reading);
                             }
                         }
-                        ftui.log(1, 'Loaded plugin: ' + name);
+                        ftui.log(1, 'Finished load plugin "' + name + '" for area "' + area + '"');
                         $('[data-type="' + name + '"]', area).removeClass('widget-hide');
 
                     } else {
-                        ftui.log(1, 'Failed to create widget: ' + name);
+                        ftui.log(1, 'Failed to load plugin "' + name + '" for area "' + area + '"');
                     }
 
                     deferredLoad.resolve();
@@ -1419,21 +1451,53 @@ var ftui = {
     },
 
     dynamicload: function (url, async) {
-        var cache = (ftui.config.DEBUG) ? false : true;
+
         ftui.log(3, 'dynamic load file:' + url + ' / async:' + async);
 
         var deferred = new $.Deferred();
+        var isAdded = false;
 
-        var script = document.createElement("script");
-        script.type = "text/javascript";
-        script.async = (async) ? true : false;
-        script.src = url;
-        script.onload = function () {
-            ftui.log(3, 'dynamic load done:' + url);
-            deferred.resolve();
-        };
+        // check if it is already included
+        for (var i = 0, len = ftui.scripts.length; i < len; i++) {
+            if (ftui.scripts[i].url === url) {
+                isAdded = true;
+                break;
+            }
+        }
 
-        document.getElementsByTagName('head')[0].appendChild(script);
+        if (!isAdded) {
+            // not yet -> load
+            if (url.match(new RegExp('^.*\.(js)$'))) {
+
+                var script = document.createElement("script");
+                script.type = "text/javascript";
+                script.async = (async) ? true : false;
+                script.src = url;
+                script.onload = function () {
+                    ftui.log(3, 'dynamic load done:' + url);
+                    deferred.resolve();
+                };
+                document.getElementsByTagName('head')[0].appendChild(script);
+            } else {
+                var link = document.createElement('link');
+                link.rel = 'stylesheet';
+                link.type = 'text/css';
+                link.href = url;
+                link.media = 'all';
+                deferred.resolve();
+                document.getElementsByTagName('head')[0].appendChild(link);
+            }
+            var scriptObject = {};
+            scriptObject.deferred = deferred;
+            scriptObject.url = url;
+            ftui.scripts.push(scriptObject);
+
+        } else {
+            // already loaded
+            ftui.log(3, 'dynamic load not neccesary for:' + url);
+            deferred = ftui.scripts[i].deferred;
+        }
+
         return deferred.promise();
     },
 
@@ -1477,6 +1541,40 @@ var ftui = {
             console.log('Shortpoll last run before: ' + d.ago());
             console.log('FHEM dev/par count: ' + Object.keys(ftui.paramIdMap).length);
             console.log('FTUI known devices count: ' + Object.keys(ftui.deviceStates).length);
+            console.log('Current modules count: ' + plugins.modules.length);
+
+            // modules details
+            var i = 0;
+            if (ftui.config.debuglevel > 1) {
+
+                for (var len = plugins.modules.length; i < len; i++) {
+
+                    console.log(i + '. ' + plugins.modules[i].widgetname + "@" + plugins.modules[i].area);
+                }
+            }
+
+            console.log('Current subscriptions count: ' + Object.keys(ftui.subscriptions).length);
+
+            // subscriptions details
+
+            i = 0;
+            for (var key in ftui.subscriptions) {
+                i++;
+                var mDev = ftui.subscriptions[key].device;
+                var mRead = ftui.subscriptions[key].reading;
+                var mValid = "--unknown--";
+                if (ftui.deviceStates[mDev]) {
+                    var params = ftui.deviceStates[mDev];
+                    if (params[mRead]) {
+                        mValid = (params[mRead].valid) ? params[mRead].val : '--known-but-invalid--';
+                    }
+                }
+                if (ftui.config.debuglevel > 1 || mValid === "--unknown--" || mValid === "--known-but-invalid--") {
+                    console.log(i + '. ' + mDev + ":" + mRead + " -> " + mValid);
+                }
+            }
+
+
             console.log('Page length: ' + $('html').html().length);
             console.log('Widgets count: ' + $('[data-type]').length);
             console.log('--------- end healthCheck ---------------');
@@ -1700,7 +1798,7 @@ var ftui = {
 
         var offset = new Date().getTimezoneOffset();
         return (m) ? new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6]) :
-            (m2) ? new Date(70, 1, 1, 0, 0, m2[1], 0) :
+            (m2) ? new Date(70, 0, 1, 0, 0, m2[1], 0) :
             (m3) ? new Date(+m3[3], +m3[2] - 1, +m3[1], 0, -offset, 0, 0) : new Date();
     },
 
@@ -1856,6 +1954,13 @@ String.prototype.toDate = function () {
 
 String.prototype.parseJson = function () {
     return ftui.parseJsonFromString(this);
+};
+
+String.prototype.toMinFromMs = function () {
+    var x = Number(this) / 1000;
+    var ss = (Math.floor(x % 60)).toString();
+    var mm = (Math.floor(x /= 60)).toString();
+    return mm + ":" + (ss[1] ? ss : "0" + ss[0]);
 };
 
 String.prototype.toMinFromSec = function () {
@@ -2018,16 +2123,17 @@ function onjQueryLoaded() {
         return ['ftui', $(this).data('type'), $(this).data('device').replace(' ', 'default'), $(this).data('get'), $(this).index()].join('_');
     };
 
-    $.fn.uuid = function () {
-        if (!$(this).isValidData('uuid')) {
-            var uuid = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+    $.fn.wgid = function () {
+        var elem = $(this);
+        if (!elem.isValidData('wgid')) {
+            var wgid = elem.data('type') + '_xxxx-xxxx-xxxx'.replace(/[xy]/g, function (c) {
                 var r = Math.random() * 16 | 0,
                     v = c == 'x' ? r : (r & 0x3 | 0x8);
                 return v.toString(16);
             });
-            $(this).attr('data-uuid', uuid);
+            elem.attr('data-wgid', wgid);
         }
-        return $(this).data('uuid');
+        return elem.data('wgid');
     };
 
     $.fn.filterData = function (key, value) {
@@ -2037,7 +2143,7 @@ function onjQueryLoaded() {
     };
 
     $.fn.filterDeviceReading = function (key, device, param) {
-        return this.filter(function () {
+        return $(this).filter(function () {
             var elem = $(this);
             var value = elem.data(key);
             return (String(value) === param && String(elem.data('device')) === device) ||
@@ -2120,7 +2226,7 @@ function onjQueryLoaded() {
 
     $.fn.isDeviceReading = function (key) {
         var reading = $(this).data(key);
-        return reading && !$.isNumeric(reading) && typeof reading === 'string' && reading.match(/:/);
+        return reading && !$.isNumeric(reading) && typeof reading === 'string' && reading.match(/^[\w\s-.]+:[\w\s-]+$/);
     };
 
     $.fn.isExternData = function (key) {

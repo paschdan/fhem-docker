@@ -1,5 +1,5 @@
 ##############################################
-# $Id: 96_allowed.pm 14888 2017-08-13 12:07:12Z rudolfkoenig $
+# $Id: 96_allowed.pm 16200 2018-02-17 12:34:42Z rudolfkoenig $
 package main;
 
 use strict;
@@ -50,6 +50,7 @@ allowed_Define($$)
   }
   $auth_refresh = 1;
   readingsSingleUpdate($hash, "state", "validFor:", 0);
+  SecurityCheck() if($init_done);
   return undef;
 }
 
@@ -77,12 +78,16 @@ allowed_Authorize($$$$)
   if($type eq "cmd") {
     return 0 if(!$me->{allowedCommands});
     # Return 0: allow stacking with other instances, see Forum#46380
-    return ($me->{allowedCommands} =~ m/\b\Q$arg\E\b/) ? 0 : 2;
+    return 0 if($me->{allowedCommands} =~ m/\b\Q$arg\E\b/);
+    Log3 $me, 3, "Forbidden command $arg for $cl->{NAME}";
+    return 2;
   }
 
   if($type eq "devicename") {
     return 0 if(!$me->{allowedDevices});
-    return ($me->{allowedDevices} =~ m/\b\Q$arg\E\b/) ? 0 : 2;
+    return if($me->{allowedDevices} =~ m/\b\Q$arg\E\b/);
+    Log3 $me, 3, "Forbidden device $arg for $cl->{NAME}";
+    return 2;
   }
 
 
@@ -104,6 +109,7 @@ allowed_Authenticate($$$$)
     my $basicAuth = AttrVal($aName, "basicAuth", undef);
     delete $cl->{".httpAuthHeader"};
     return 0 if(!$basicAuth);
+    return 2 if(!$param);
 
     my $FW_httpheader = $param;
     my $secret = $FW_httpheader->{Authorization};
@@ -140,6 +146,8 @@ allowed_Authenticate($$$$)
       }
 
     }
+    Log3 $me, 3, "Login denied by $aName for $user via $cl->{NAME}"
+        if(!$pwok && $user);
 
     # Add Cookie header ONLY if authentication with basicAuth was succesful
     if($pwok && (!defined($authcookie) || $secret ne $authcookie)) {
@@ -244,8 +252,10 @@ allowed_Attr(@)
     } else {
       delete($hash->{$attrName});
     }
-    readingsSingleUpdate($hash, "state", "validFor:".join(",",@param), 1)
-      if($attrName eq "validFor");
+    if($attrName eq "validFor") {
+      readingsSingleUpdate($hash, "state", "validFor:".join(",",@param), 1);
+      InternalTimer(1, "SecurityCheck", 0) if($init_done);
+    }
 
   } elsif(($attrName eq "basicAuth" ||
            $attrName eq "password" || $attrName eq "globalpassword") &&
@@ -253,6 +263,7 @@ allowed_Attr(@)
     foreach my $d (devspec2array("TYPE=(FHEMWEB|telnet)")) {
       delete $defs{$d}{Authenticated} if($defs{$d});
     }
+    InternalTimer(1, "SecurityCheck", 0) if($init_done);
   }
 
   return undef;
@@ -266,11 +277,16 @@ allowed_fhemwebFn($$$$)
   my $hash = $defs{$d};
 
   my $vf = $defs{$d}{validFor} ? $defs{$d}{validFor} : "";
-  my @arr = map { "<input type='checkbox' ".($vf =~ m/\b$_\b/ ? "checked ":"").
-                   "name='$_' class='vfAttr'><label>$_</label>" }
+  my (@F_arr, @t_arr);
+  my @arr = map {
+              push(@F_arr, $_) if($defs{$_}{TYPE} eq "FHEMWEB");
+              push(@t_arr, $_) if($defs{$_}{TYPE} eq "telnet");
+              "<input type='checkbox' ".($vf =~ m/\b$_\b/ ? "checked ":"").
+                   "name='$_' class='vfAttr'><label>$_</label>"
+            }
             grep { !$defs{$_}{SNAME} }
             devspec2array("TYPE=(FHEMWEB|telnet)");
-  return "<input id='vfAttr' type='button' value='attr'> $d validFor <ul>".
+  my $r = "<input id='vfAttr' type='button' value='attr'> $d validFor <ul>".
           join("<br>",@arr)."</ul><script>var dev='$d';".<<'EOF';
 $("#vfAttr").click(function(){
   var names=[];
@@ -279,6 +295,15 @@ $("#vfAttr").click(function(){
 });
 </script>
 EOF
+
+  $r .= "For ".join(",",@F_arr).
+        ": \"set $d basicAuth &lt;username&gt; &lt;password&gt;\"<br>"
+    if(@F_arr);
+  $r .= "For ".join(",",@t_arr).
+        ": \"set $d password &lt;password&gt;\" or".
+        "  \"set $d globalpassword &lt;password&gt;\"<br>"
+    if(@t_arr);
+  return $r;
 }
 
 1;

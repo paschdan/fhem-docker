@@ -1,10 +1,10 @@
 jQuery(document).ready(function ($) {
 
-    var themeVersion = '2.4';
+    var themeVersion = '2.6';
 
     // Check für JS-Installation entfernen
     $('#hdr').addClass('js-installed');
-    
+
     // Add version to logo
     $('#logo').append(
         $('<span class="theme-version">' + themeVersion + '</span>')
@@ -20,8 +20,6 @@ jQuery(document).ready(function ($) {
 
     // Add missing classes for elements
     $('.SVGplot').prevAll('a').addClass('plot-nav');
-    $('.SVGplot').parents('tr.odd').addClass('no-background').parents('.block').addClass('no-background');
-    $('.SVGplot').parents('tr.even').addClass('no-background').parents('.block').addClass('no-background');
 
     // Icon selection
     $('button.dist').wrapAll('<div class="icons"/>');
@@ -55,5 +53,9 @@ jQuery(document).ready(function ($) {
     // Klick auf Error-Message blendet diese aus
     $('body').on('click', '#errmsg', function() {
         $(this).hide();
+    });
+
+    $('.roomoverview .col1, .makeTable .col1').each(function(index) {
+        $(this).parent().addClass('first-table-column');
     });
 });

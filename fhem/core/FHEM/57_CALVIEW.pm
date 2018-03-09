@@ -1,4 +1,4 @@
-# $Id: 57_CALVIEW.pm 15453 2017-11-19 12:26:11Z chris1284 $
+# $Id: 57_CALVIEW.pm 16023 2018-01-28 16:28:47Z chris1284 $
 ############################
 #	CALVIEW
 #	needs a defined Device 57_Calendar
@@ -132,8 +132,8 @@ sub CALVIEW_GetUpdate($){
 		else {$item->[2] = "no enddate"}
 		#replace the "\," with ","
 		if(length($item->[1]) > 0){ $item->[1] =~ s/\\,/,/g; }
-		if( defined($item->[4]) && length($item->[4]) > 0){ $item->[4] =~ s/\\,/,/g; }
-		if( defined($item->[5]) && length($item->[5]) > 0){ $item->[5] =~ s/\\,/,/g; }
+		if( defined($item->[4]) && length($item->[4]) > 0){ $item->[4] =~ s/\\,/,/g; } elsif( !defined($item->[4])){$item->[4] = " ";} 
+		if( defined($item->[5]) && length($item->[5]) > 0){ $item->[5] =~ s/\\,/,/g; } elsif( !defined($item->[5])){$item->[5] = " ";} 
 		#berechnen verbleibender tage bis zum termin
 		my $eventDate = fhemTimeLocal(0,0,0,$D,$M-1,$Y-1900);
 		my $daysleft = floor(($eventDate - time) / 60 / 60 / 24 + 1);

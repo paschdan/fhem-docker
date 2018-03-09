@@ -8,7 +8,7 @@
 "use strict";
 
 function depends_thermostat() {
-    if (typeof Modul_knob == 'undefined' || !$.fn.knob) {
+    if (typeof window["Modul_knob"] === 'undefined' || !$.fn.knob) {
         return ["knob"];
     }
 }
@@ -156,9 +156,11 @@ var Modul_thermostat = function () {
 
     function init() {
 
-        me.elements = $('div[data-type="' + me.widgetname + '"]', me.area);
+        me.elements = $('div[data-type="' + me.widgetname + '"]:not([data-ready])', me.area);
         me.elements.each(function (index) {
             var elem = $(this);
+            elem.attr("data-ready", "");
+            
             elem.initData('get', 'desired-temp');
             elem.initData('set', elem.data('get'));
             elem.initData('temp', 'measured-temp');

@@ -1,5 +1,5 @@
 ##############################################
-# $Id: 10_KNX.pm 15259 2017-10-14 18:48:05Z andi291 $
+# $Id: 10_KNX.pm 15906 2018-01-16 18:33:07Z andi291 $
 # ABU 20160307 First release
 # ABU 20160309 Fixed issue for sending group-indexed with dpt1. Added debug-information. Fixed issue for indexed get. Fixed regex-replace-issue.
 # ABU 20160312 Fixed error while receiving numeric DPT with value 0. Added factor for dpt 08.010.
@@ -37,6 +37,10 @@
 # ABU 20170622 finetuned doku
 # ABU 20171006 added sub-dpt1
 # ABU 20171006 added dpt19
+# ABU 20171212 added dpt14.057
+# ABU 20171212 finetuned doku
+# ABU 20171215 added fix for newline in def
+# docm 20180109 fixed problem with dpt16 reading-set
 
 package main;
 
@@ -181,6 +185,7 @@ my %dpttypes = (
 	"dpt14.019"		=> {CODE=>"dpt14", UNIT=>"A", FACTOR=>1, OFFSET=>0, PATTERN=>qr/[+-]?\d{1,40}[.,]?\d{1,4}/, MIN=>undef, MAX=>undef},
 	"dpt14.027"		=> {CODE=>"dpt14", UNIT=>"V", FACTOR=>1, OFFSET=>0, PATTERN=>qr/[+-]?\d{1,40}[.,]?\d{1,4}/, MIN=>undef, MAX=>undef},    
 	"dpt14.056"		=> {CODE=>"dpt14", UNIT=>"W", FACTOR=>1, OFFSET=>0, PATTERN=>qr/[+-]?\d{1,40}[.,]?\d{1,4}/, MIN=>undef, MAX=>undef},
+	"dpt14.057"		=> {CODE=>"dpt14", UNIT=>"cos &Phi;", FACTOR=>1, OFFSET=>0, PATTERN=>qr/[+-]?\d{1,40}[.,]?\d{1,4}/, MIN=>undef, MAX=>undef},  	
 	"dpt14.068"		=> {CODE=>"dpt14", UNIT=>"&deg;C", FACTOR=>1, OFFSET=>0, PATTERN=>qr/[+-]?\d{1,40}[.,]?\d{1,4}/, MIN=>undef, MAX=>undef},  
 	"dpt14.076"		=> {CODE=>"dpt14", UNIT=>"m&sup3;", FACTOR=>1, OFFSET=>0, PATTERN=>qr/[+-]?\d{1,40}[.,]?\d{1,4}/, MIN=>undef, MAX=>undef},  
   
@@ -232,6 +237,7 @@ KNX_Initialize($) {
 sub
 KNX_Define($$) {
 	my ($hash, $def) = @_;
+	$def =~ s/\n/ /g;
 	my @a = split("[ \t][ \t]*", $def);
 	#device name
 	my $name = $a[0];
@@ -580,12 +586,21 @@ KNX_Set($@) {
 	{
 		return "\"string\" only allowed for dpt16" if (not($code eq "dpt16"));
 		return "no data for cmd $cmd" if ($lastArg < 2);
-		
+
 		#join string
-		for (my $i=2; $i<=$lastArg; $i++)
+		#docm 180109 removed
+		#		for (my $i=2; $i<=$lastArg; $i++)
+		#		{
+		#		  $value.= $a[$i]." ";		  
+		#		}
+
+		#docm 180109 inserted
+		$value = $a[2];
+		for (my $i=3; $i<=$lastArg; $i++)
 		{
-		  $value.= $a[$i]." ";		  
-		}				
+		  $value.= " ".$a[$i];		  
+		}
+		#docm 180109 changes end
 	} 	
 	#set RGB <RRGGBB>
 	elsif ($cmd =~ m/$RGB/)
@@ -1572,6 +1587,11 @@ KNX_decodeByDpt ($$$) {
 		$numval = 0;
 		$state  = "";
 		
+		#docm 180109 inserted
+		$value =~ /^\s*(00)?(\S+)/;
+		$value = $2;
+		#docm 180109 changes end				
+		
 		for (my $i = 0; $i < 14; $i++) 
 		{
 			my $c = hex(substr($value, $i * 2, 2));
@@ -1894,9 +1914,9 @@ sub KNX_getCmdList ($$$)
 	dpt1.017 trigger, trigger<br>
 	dpt1.018 not occupied, occupied<br>
 	dpt1.019 closed, open<br>
-	dpt1.020 logical or, logical and<br>
-	dpt1.021 scene A, scene B<br>
-	dpt1.022 move up/down, move and step mode<br>
+	dpt1.021 logical or, logical and<br>
+	dpt1.022 scene A, scene B<br>
+	dpt1.023 move up/down, move and step mode<br>
 	dpt2 value on, value off, value forceOn, value forceOff<br>
 	dpt3 -100..+100<br>
 	dpt5 0..255<br>
@@ -1939,11 +1959,13 @@ sub KNX_getCmdList ($$$)
 	dpt14.019 -Inf.0..+Inf.0 A<br>
 	dpt14.027 -Inf.0..+Inf.0 V<br>
 	dpt14.056 -Inf.0..+Inf.0 W<br>
+	dpt14.057 -Inf.0..+Inf.0 cos&Phi;<br>		
 	dpt14.068 -Inf.0..+Inf.0 &degC;<br>
 	dpt14.076 -Inf.0..+Inf.0 m&sup3;<br>
 	dpt16 String;<br>
 	dpt16.000 ASCII-String;<br>
 	dpt16.001 ISO-8859-1-String (Latin1);<br>
+	dpt19 01.12.2010_01:00:00<br>
 	dpt232 RGB-Value RRGGBB<br>
   </ul>		
 </ul>
@@ -2176,9 +2198,9 @@ sub KNX_getCmdList ($$$)
 	dpt1.017 trigger, trigger<br>
 	dpt1.018 not occupied, occupied<br>
 	dpt1.019 closed, open<br>
-	dpt1.020 logical or, logical and<br>
-	dpt1.021 scene A, scene B<br>
-	dpt1.022 move up/down, move and step mode<br>
+	dpt1.021 logical or, logical and<br>
+	dpt1.022 scene A, scene B<br>
+	dpt1.023 move up/down, move and step mode<br>
 	dpt2 value on, value off, value forceOn, value forceOff<br>
 	dpt3 -100..+100<br>
 	dpt5 0..255<br>
@@ -2221,11 +2243,13 @@ sub KNX_getCmdList ($$$)
 	dpt14.019 -Inf.0..+Inf.0 A<br>
 	dpt14.027 -Inf.0..+Inf.0 V<br>
 	dpt14.056 -Inf.0..+Inf.0 W<br>
+	dpt14.057 -Inf.0..+Inf.0 cos&Phi;<br>		
 	dpt14.068 -Inf.0..+Inf.0 &degC;<br>
 	dpt14.076 -Inf.0..+Inf.0 m&sup3;<br>
 	dpt16 String;<br>
 	dpt16.000 ASCII-String;<br>
 	dpt16.001 ISO-8859-1-String (Latin1);<br>
+	dpt19 01.12.2010_01:00:00<br>
 	dpt232 RGB-Value RRGGBB<br>
   </ul>
 </ul>

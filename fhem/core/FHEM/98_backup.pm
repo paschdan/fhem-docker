@@ -1,5 +1,5 @@
 ################################################################
-# $Id: 98_backup.pm 11984 2016-08-19 12:47:50Z rudolfkoenig $
+# $Id: 98_backup.pm 15862 2018-01-12 21:01:28Z rudolfkoenig $
 # vim: ts=2:et
 #
 #  (c) 2012 Copyright: Martin Fischer (m_fischer at gmx dot de)
@@ -29,7 +29,7 @@ use warnings;
 sub CommandBackup($$);
 sub parseConfig($);
 sub readModpath($$);
-sub createArchiv($$);
+sub createArchiv($$$);
 
 my @pathname;
 
@@ -48,6 +48,7 @@ CommandBackup($$)
 {
   my ($cl, $param) = @_;
 
+  my $byUpdate = ($param && $param eq "startedByUpdate");
   my $modpath    = AttrVal("global", "modpath","");
   my $configfile = AttrVal("global", "configfile", "");
   my $statefile  = AttrVal("global", "statefile", "");
@@ -100,7 +101,7 @@ CommandBackup($$)
   $ret = readModpath($modpath,$backupdir);
 
   # create archiv
-  $ret = createArchiv($backupdir, $cl);
+  $ret = createArchiv($backupdir, $cl, $byUpdate);
 
   @pathname = [];
   undef @pathname;
@@ -165,9 +166,9 @@ readModpath($$)
 }
 
 sub
-createArchiv($$)
+createArchiv($$$)
 {
-  my ($backupdir,$cl) = @_;
+  my ($backupdir,$cl,$byUpdate) = @_;
   my $backupcmd = (!defined($attr{global}{backupcmd}) ? undef : $attr{global}{backupcmd});
   my $symlink = (!defined($attr{global}{backupsymlink}) ? "no" : $attr{global}{backupsymlink});
   my $tarOpts;
@@ -197,7 +198,7 @@ createArchiv($$)
 
   }
   Log 2, "Backup with command: $cmd";
-  if($cl && ref($cl) eq "HASH" && $cl->{TYPE} && $cl->{TYPE} eq "FHEMWEB") {
+  if(!$fhemForked && !$byUpdate) {
     use Blocking;
     our $BC_telnetDevice;
     BC_searchTelnet("backup");

@@ -21,7 +21,7 @@
 #  GNU General Public License for more details.
 #
 #
-# $Id: 74_XiaomiFlowerSens.pm 15467 2017-11-20 22:48:19Z CoolTux $
+# $Id: 74_XiaomiFlowerSens.pm 15805 2018-01-06 20:11:24Z CoolTux $
 #
 ###############################################################################
 
@@ -47,7 +47,11 @@ use JSON;
 use Blocking;
 
 
-my $version = "1.2.3";
+my $version = "1.4.1";
+
+
+
+
 my %CallBatteryFirmwareAge = (  '8h'    => 28800,
                                 '16h'   => 57600,
                                 '24h'   => 86400,
@@ -246,11 +250,13 @@ sub XiaomiFlowerSens_Notify($$) {
     return if (!$events);
 
 
-    XiaomiFlowerSens_stateRequestTimer($hash) if( grep /^INITIALIZED$/,@{$events}
-                                                or grep /^DELETEATTR.$name.disable$/,@{$events}
-                                                or grep /^DELETEATTR.$name.interval$/,@{$events}
-                                                or grep /^ATTR.$name.interval.[0-9]+/,@{$events}
-                                                or (grep /^DEFINED.$name$/,@{$events} and $init_done) );
+    XiaomiFlowerSens_stateRequestTimer($hash) if( (grep /^DEFINED.$name$/,@{$events}
+                                                    or grep /^INITIALIZED$/,@{$events}
+                                                    or grep /^MODIFIED.$name$/,@{$events}
+                                                    or grep /^DELETEATTR.$name.disable$/,@{$events}
+                                                    or grep /^ATTR.$name.disable.0$/,@{$events}
+                                                    or grep /^DELETEATTR.$name.interval$/,@{$events}
+                                                    or grep /^ATTR.$name.interval.[0-9]+/,@{$events} ) and $init_done );
     return;
 }
 
@@ -301,6 +307,8 @@ sub XiaomiFlowerSens_stateRequestTimer($) {
     
     my $name        = $hash->{NAME};
 
+    
+    RemoveInternalTimer($hash);
     
     if( $init_done and not IsDisabled($name) ) {
         
@@ -434,6 +442,7 @@ sub XiaomiFlowerSens_ExecGatttool_Run($) {
         $cmd .= "--char-write-req -a $handle -n $value" if($gattCmd eq 'write');
         $cmd .= " 2>&1 /dev/null";
         $cmd .= "'" if($sshHost ne 'none');
+        $cmd = "ssh $sshHost 'gatttool -i $hci -b $mac --char-write-req -a 0x33 -n A01F && gatttool -i $hci -b $mac --char-read -a 0x35 2>&1 /dev/null'" if($sshHost ne 'none' and $gattCmd eq 'write');
         
         $loop = 0;
         do {
@@ -443,10 +452,16 @@ sub XiaomiFlowerSens_ExecGatttool_Run($) {
             Log3 $name, 5, "XiaomiFlowerSens ($name) - ExecGatttool_Run: gatttool loop result ".join(",", @gtResult);
             $loop++;
             
+            $gtResult[0] = 'connect error'
+            unless( defined($gtResult[0]) );
+            
         } while( $loop < 5 and $gtResult[0] eq 'connect error' );
         
         Log3 $name, 4, "XiaomiFlowerSens ($name) - ExecGatttool_Run: gatttool result ".join(",", @gtResult);
         
+        $handle = '0x35' if($sshHost ne 'none' and $gattCmd eq 'write');
+        $gattCmd = 'read' if($sshHost ne 'none' and $gattCmd eq 'write');
+
         $gtResult[1] = 'no data response'
         unless( defined($gtResult[1]) );
         
@@ -659,7 +674,10 @@ sub XiaomiFlowerSens_ProcessingErrors($$) {
 sub XiaomiFlowerSens_encodeJSON($) {
 
     my $gtResult    = shift;
-
+    
+    
+    chomp($gtResult);
+    
     my %response = (
         'gtResult'      => $gtResult
     );
@@ -769,6 +787,7 @@ sub XiaomiFlowerSens_CallBatteryFirmware_IsUpdateTimeAgeToOld($$) {
   <b>Attributes</b>
   <ul>
     <li>disable - disables the device</li>
+    <li>disabledForIntervals - disable device for interval time (13:00-18:30 or 13:00-18:30 22:00-23:00)</li>
     <li>interval - interval in seconds for statusRequest</li>
     <li>minFertility - min fertility value for low warn event</li>
     <li>maxFertility - max fertility value for High warn event</li>
@@ -809,8 +828,8 @@ sub XiaomiFlowerSens_CallBatteryFirmware_IsUpdateTimeAgeToOld($$) {
       <code>define Weihnachtskaktus XiaomiFlowerSens C4:7C:8D:62:42:6F</code><br />
     </ul>
     <br />
-	Der Befehl legt ein Device vom Typ XiaomiFlowerSens an mit dem Namen Weihnachtskaktus und der Bluetooth MAC C4:7C:8D:62:42:6F.<br />
-	Nach dem Anlegen des Device werden umgehend und automatisch die aktuellen Daten vom betroffenen Xiaomi Flower Monitor gelesen.
+    Der Befehl legt ein Device vom Typ XiaomiFlowerSens an mit dem Namen Weihnachtskaktus und der Bluetooth MAC C4:7C:8D:62:42:6F.<br />
+    Nach dem Anlegen des Device werden umgehend und automatisch die aktuellen Daten vom betroffenen Xiaomi Flower Monitor gelesen.
   </ul>
   <br /><br />
   <a name="XiaomiFlowerSensreadings"></a>
@@ -845,6 +864,7 @@ sub XiaomiFlowerSens_CallBatteryFirmware_IsUpdateTimeAgeToOld($$) {
   <ul>
     <li>disable - deaktiviert das Device</li>
     <li>interval - Interval in Sekunden zwischen zwei Abfragen</li>
+    <li>disabledForIntervals - deaktiviert das Gerät für den angegebenen Zeitinterval (13:00-18:30 or 13:00-18:30 22:00-23:00)</li>
     <li>minFertility - min Fruchtbarkeits-Grenzwert f&uuml;r ein Ereignis minFertility low </li>
     <li>maxFertility - max Fruchtbarkeits-Grenzwert f&uuml;r ein Ereignis maxFertility high </li>
     <li>minMoisture - min Feuchtigkeits-Grenzwert f&uuml;r ein Ereignis minMoisture low </li> 

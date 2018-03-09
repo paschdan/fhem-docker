@@ -1,5 +1,5 @@
 ##############################################
-# $Id: HttpUtils.pm 15434 2017-11-15 13:21:28Z rudolfkoenig $
+# $Id: HttpUtils.pm 15631 2017-12-17 12:33:03Z rudolfkoenig $
 package main;
 
 use strict;
@@ -82,6 +82,7 @@ HttpUtils_Close($)
   delete($hash->{hu_port});
   delete($hash->{directReadFn});
   delete($hash->{directWriteFn});
+  delete($hash->{compress});
 }
 
 sub
@@ -319,7 +320,17 @@ HttpUtils_Connect($)
   $hash->{hu_port} = $port;
   $hash->{path} = '/' unless defined($hash->{path});
   $hash->{addr} = "$hash->{protocol}://$host:$port";
-  $hash->{auth} = urlDecode("$user:$pwd") if($authstring);
+  
+  if($authstring) {
+   $hash->{auth} = 1;
+   $hash->{user} = urlDecode("$user");
+   $hash->{pwd} = urlDecode("$pwd");
+  } elsif(defined($hash->{user}) && defined($hash->{pwd})) {
+   $hash->{auth} = 1;
+  } else  {
+   $hash->{auth} = 0;
+  }
+  
 
   my $proxy = AttrVal("global", "proxy", undef);
   if($proxy) {
@@ -331,6 +342,17 @@ HttpUtils_Connect($)
       $hash->{hu_proxy} = 1;
     }
   }
+
+  if((!defined($hash->{compress}) || $hash->{compress}) &&
+      AttrVal("global", "httpcompress", 1)) {
+    if(!defined($HU_use_zlib)) {
+      $HU_use_zlib = 1;
+      eval { require Compress::Zlib; };
+      $HU_use_zlib = 0 if($@);
+    }
+    $hash->{compress} = $HU_use_zlib;
+  }
+
 
   return HttpUtils_Connect2($hash) if($hash->{conn} && $hash->{keepalive});
 
@@ -397,15 +419,6 @@ HttpUtils_Connect($)
 
     return "$hash->{displayurl}: Can't connect(1) to $hash->{addr}: $@"
       if(!$hash->{conn});
-  }
-
-  if($hash->{compress}) {
-    if(!defined($HU_use_zlib)) {
-      $HU_use_zlib = 1;
-      eval { require Compress::Zlib; };
-      $HU_use_zlib = 0 if($@);
-    }
-    $hash->{compress} = $HU_use_zlib;
   }
 
   return HttpUtils_Connect2($hash);
@@ -520,8 +533,9 @@ HttpUtils_Connect2($)
   $hdr .= "Connection: Close\r\n"
                               if($httpVersion ne "1.0" && !$hash->{keepalive});
 
-  $hdr .= "Authorization: Basic ".encode_base64($hash->{auth}, "")."\r\n"
-              if(defined($hash->{auth}) && !$hash->{digest} &&
+  $hdr .= "Authorization: Basic ".
+                      encode_base64($hash->{user}.":".$hash->{pwd}, "")."\r\n"
+              if($hash->{auth} && !$hash->{digest} &&
                  !($hash->{header} &&
                    $hash->{header} =~ /^Authorization:\s*Digest/mi));
   $hdr .= $hash->{header}."\r\n" if($hash->{header});
@@ -601,7 +615,6 @@ sub
 HttpUtils_DataComplete($)
 {
   my ($hash) = @_;
-  my ($hdr, $data) = ($1, $2);
   my $hl = $hash->{httpdatalen};
   if(!defined($hl)) {
     return 0 if($hash->{buf} !~ m/^(.*?)\r?\n\r?\n(.*)$/s);
@@ -659,7 +672,7 @@ HttpUtils_DigestHeader($$)
   } 
  
   my ($ha1, $ha2, $response);
-  my ($user,$passwd) = split(/:/, $hash->{auth}, 2);
+  my ($user,$passwd) = ($hash->{user}, $hash->{pwd});
 
   if(exists($digdata{qop})) {
     $digdata{nc} = "00000001";
@@ -730,8 +743,11 @@ HttpUtils_ParseAnswer($)
     if($hash->{buf} =~ m/^(HTTP.*?)\r?\n\r?\n(.*)$/s) {
       $hash->{httpheader} = $1;
       $hash->{httpdata} = $2;
+      delete($hash->{buf});
     } else {
-      return ("", $hash->{buf});
+      my $ret = $hash->{buf};
+      delete($hash->{buf});
+      return ("", $ret);
     }
   }
   my $ret = $hash->{httpdata};
@@ -755,7 +771,7 @@ HttpUtils_ParseAnswer($)
   $hash->{code} = $code;
 
   # if servers requests digest authentication
-  if($code==401 && defined($hash->{auth}) &&
+  if($code==401 && $hash->{auth} &&
     !($hash->{header} && $hash->{header} =~ /^Authorization:\s*Digest/mi) &&
     $hash->{httpheader} =~ /^WWW-Authenticate:\s*Digest\s*(.+?)\s*$/mi) {
    
@@ -771,7 +787,7 @@ HttpUtils_ParseAnswer($)
       return HttpUtils_BlockingGet($hash);
     }
    
-  } elsif($code==401 && defined($hash->{auth})) {
+  } elsif($code==401 && $hash->{auth}) {
     return ("$hash->{displayurl}: wrong authentication", "")
 
   }
@@ -796,6 +812,20 @@ HttpUtils_ParseAnswer($)
       }
     }
   }
+  
+  if($HU_use_zlib) {
+    if($hash->{httpheader} =~ /^Content-Encoding: gzip/mi) {
+      eval { $ret =  Compress::Zlib::memGunzip($ret) };
+      return ($@, $ret) if($@);
+    }
+  
+    if($hash->{httpheader} =~ /^Content-Encoding: deflate/mi) {
+      eval { my $i =  Compress::Zlib::inflateInit();
+             my $out = $i->inflate($ret);
+             $ret = $out if($out) };
+      return ($@, $ret) if($@);
+    }
+  }
 
   # Debug
   Log3 $hash, $hash->{loglevel}+1,
@@ -811,9 +841,10 @@ HttpUtils_ParseAnswer($)
 #  optional(default):
 #    digest(0),hideurl(0),timeout(4),data(""),loglevel(4),header("" or HASH),
 #    noshutdown(1),shutdown(0),httpversion("1.0"),ignoreredirects(0)
-#    method($data ? "POST" : "GET"),keepalive(0),sslargs({})
+#    method($data?"POST":"GET"),keepalive(0),sslargs({}),user(),pwd()
+#    compress(1)
 # Example:
-#   { HttpUtils_NonblockingGet({ url=>"http://www.google.de/",
+#   { HttpUtils_NonblockingGet({ url=>"http://fhem.de/MAINTAINER.txt",
 #     callback=>sub($$$){ Log 1,"ERR:$_[1] DATA:".length($_[2]) } }) }
 sub
 HttpUtils_NonblockingGet($)
@@ -833,6 +864,7 @@ sub
 HttpUtils_BlockingGet($)
 {
   my ($hash) = @_;
+  delete $hash->{callback}; # Forum #80712
   $hash->{hu_blocking} = 1;
   my ($isFile, $fErr, $fContent) = HttpUtils_File($hash);
   return ($fErr, $fContent) if($isFile);

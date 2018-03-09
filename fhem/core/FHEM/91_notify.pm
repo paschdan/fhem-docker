@@ -1,5 +1,5 @@
 ##############################################
-# $Id: 91_notify.pm 14888 2017-08-13 12:07:12Z rudolfkoenig $
+# $Id: 91_notify.pm 15937 2018-01-20 13:43:28Z rudolfkoenig $
 package main;
 
 use strict;
@@ -16,7 +16,7 @@ notify_Initialize($)
   $hash->{NotifyFn} = "notify_Exec";
   $hash->{AttrFn}   = "notify_Attr";
   $hash->{AttrList} ="disable:1,0 disabledForIntervals forwardReturnValue:1,0 ".
-                     "readLog:1,0 showtime:1,0 addStateEvent:1,0";
+                     "readLog:1,0 showtime:1,0 addStateEvent:1,0 ignoreRegexp";
   $hash->{SetFn}    = "notify_Set";
   $hash->{StateFn}  = "notify_State";
   $hash->{FW_detailFn} = "notify_fhemwebFn";
@@ -72,6 +72,7 @@ notify_Exec($$)
 
   my $n = $dev->{NAME};
   my $re = $ntfy->{REGEXP};
+  my $iRe = AttrVal($ln, "ignoreRegexp", undef);
   my $events = deviceEvents($dev, AttrVal($ln, "addStateEvent", 0));
   return if(!$events); # Some previous notify deleted the array.
   my $max = int(@{$events});
@@ -81,7 +82,7 @@ notify_Exec($$)
   for (my $i = 0; $i < $max; $i++) {
     my $s = $events->[$i];
     $s = "" if(!defined($s));
-    my $found = ($n =~ m/^$re$/ || "$n:$s" =~ m/^$re$/);
+    my $found = ($n =~ m/^$re$/ || "$n:$s" =~ m/^$re$/s);
     if(!$found && AttrVal($n, "eventMap", undef)) {
       my @res = ReplaceEventMap($n, [$n,$s], 0);
       shift @res;
@@ -89,6 +90,7 @@ notify_Exec($$)
       $found = ("$n:$s" =~ m/^$re$/);
     }
     if($found) {
+      next if($iRe && ($n =~ m/^$iRe$/ || "$n:$s" =~ m/^$iRe$/));
       Log3 $ln, 5, "Triggering $ln";
       my %specials= (
                 "%NAME" => $n,
@@ -131,6 +133,12 @@ notify_Attr(@)
       delete $logInform{$a[1]};
     }
     return;
+  }
+
+  if($a[0] eq "set" && $a[2] eq "ignoreRegexp") {
+    return "Missing argument for ignoreRegexp" if(!defined($a[3]));
+    eval { "HALLO" =~ m/$a[3]/ };
+    return $@;
   }
 
   if($a[0] eq "set" && $a[2] eq "disable") {
@@ -220,7 +228,8 @@ notify_fhemwebFn($$$$)
   my ($FW_wname, $d, $room, $pageHash) = @_; # pageHash is set for summaryFn.
   my $hash = $defs{$d};
 
-  my $ret .= "Change wizard<br><table class='block wide'>";
+  my $ret .= "<div class='makeTable wide'><span>Change wizard</span>".
+             "<table class='block wide'>";
   my $row = 0;
   my @ra = split(/\|/, $hash->{REGEXP});
   $ret .= "<tr class='".(($row++&1)?"odd":"even").
@@ -266,7 +275,7 @@ notify_fhemwebFn($$$$)
     $ret .= "</td></tr>";
   }
   my ($tr, $js) = notfy_addFWCmd($d, $hash->{REGEXP}, $row);
-  return "$ret$tr</table><br>$js";
+  return "$ret$tr</table></div><br>$js";
 }
 
 sub
@@ -518,6 +527,13 @@ END
         FHEMWEB to display this value, when clicking "on" or "off", which is
         often not intended.</li>
 
+    <a name="ignoreRegexp"></a>
+    <li>ignoreRegexp regexp<br>
+        It is hard to create a regexp which is _not_ matching something, this
+        attribute helps in this case, as the event is ignored if matches the
+        argument. The syntax is the same as for the original regexp.
+        </li>
+
     <a name="readLog"></a>
     <li>readLog<br>
         Execute the notify for messages appearing in the FHEM Log. The device
@@ -733,6 +749,14 @@ END
         R&uuml;ckgabe der Werte eines ausgef&uuml;hrten Kommandos an den
         Aufrufer.  Die Voreinstellung ist 0 (ausgeschaltet), um weniger
         Meldungen im Log zu haben.
+        </li>
+
+    <a name="ignoreRegexp"></a>
+    <li>ignoreRegexp regexp<br>
+        Es ist nicht immer einfach ein Regexp zu bauen, was etwas _nicht_
+        matcht. Dieses Attribu hilft in diesen F&auml;llen: das Event wird
+        ignoriert, falls den angegebenen Regexp. Syntax ist gleich wie in der
+        Definition.
         </li>
 
     <a name="readLog"></a>
