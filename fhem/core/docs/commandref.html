@@ -187,6 +187,8 @@
       <a href="#FRM_ROTENC">FRM_ROTENC</a> &nbsp;
       <a href="#FRM_SERVO">FRM_SERVO</a> &nbsp;
       <a href="#FRM_STEPPER">FRM_STEPPER</a> &nbsp;
+      <a href="#fronthem">fronthem</a> &nbsp;
+      <a href="#fronthemDevice">fronthemDevice</a> &nbsp;
       <a href="#FS20">FS20</a> &nbsp;
       <a href="#FTUISRV">FTUISRV</a> &nbsp;
       <a href="#FULLY">FULLY</a> &nbsp;
@@ -21119,7 +21121,7 @@ requires XML:Simple -> sudo apt-get install libxml-simple-perl<br>
         Following is the list of known modifiers:
         <ul>
         <!-- INSERT_DOC_FROM: www/pgm2/fhemweb.*.js -->
-<p><p>  <li>noArg - show no input field.</li>
+  <li>noArg - show no input field.</li>
   <li>time - show a JavaScript driven timepicker.<br>
       Example: attr FS20dev widgetOverride on-till:time</li>
   <li>textField - show an input field.<br>
@@ -21146,7 +21148,25 @@ requires XML:Simple -> sudo apt-get install libxml-simple-perl<br>
   <li>select,&lt;val1&gt;,&lt;val2&gt;,... - show a dropdown with all values.
       <b>NOTE</b>: this is also the fallback, if no modifier is found.</li>
 
-<p><br>
+<p>  <li>colorpicker,RGB - create an RGB colorpicker</li>
+
+  <li>colorpicker,HSV - create an HSV colorpicker to set an rgb value</li>
+
+  <li>colorpicker,HSVp - create an HSV popup colorpicker to set an rgb value</li>
+
+  <li>colorpicker,HSV,&lt;hue&gt;,&lt;min&gt;,&lt;step&gt;,&lt;max&gt;,&lt;sat&gt,&lt;min&gt;,&lt;step&gt;,&lt;max&gt;,&lt;bri&gt,&lt;min&gt;,&lt;step&gt;,&lt;max&gt;
+      - create an HSV colorpicker that uses &lt;hue&gt;, &lt;sat&gt; and &lt;bri&gt; as commands
+      to set the color. can also be used with HSVp to create a popup colorpicker<br>
+      if the device has no combined hsv reading it can be create with the following user reading:<code>attr <device> userReadings hsv {ReadingsVal($name,'hue','0').','.ReadingsVal($name,'sat','100').','.ReadingsVal($name,'bri','100')}</code></li>
+
+  <li>colorpicker,CT,&lt;min&gt;,&lt;step&gt;,&lt;max&gt; - create a color temperature colorpicker</li>
+
+  <li>colorpicker,BRI,&lt;min&gt;,&lt;step&gt;,&lt;max&gt; - create a brightness colorpicker</li>
+
+  <li>colorpicker,HUE,&lt;min&gt;,&lt;step&gt;,&lt;max&gt; - create a hue colorpicker</li>
+  please see the fhem wiki <a href='https://wiki.fhem.de/wiki/Color#Colorpicker'>Color</a> section for example screenshots.<br><br>
+
+<p><p><p><br>
   <u>To the icon.* widgets listed below applies:</u><br>
   &lt;color&gt; is specified by a color name or a color number without leading <b>#</b> e.g. FFA500 or orange. Depending on the context <b>@</b> has to be escaped <b>\@</b>.<br>
   &lt;icon&gt; is the icon name.<br>
@@ -21186,7 +21206,7 @@ requires XML:Simple -> sudo apt-get install libxml-simple-perl<br>
     the icon. If nothing is specified, the reference value will be displayed.<br>
   </li>
 <br>
-<p>  <li>knob,min:1,max:100,... - shows the jQuery knob widget. The parameters
+<p><p>  <li>knob,min:1,max:100,... - shows the jQuery knob widget. The parameters
       are a comma separated list of key:value pairs, where key does not have to
       contain the "data-" prefix. For details see the jQuery-knob
       definition.<br> Example:
@@ -21203,24 +21223,6 @@ requires XML:Simple -> sudo apt-get install libxml-simple-perl<br>
 
   <li>:sortable-given,val1,val2,... - the specified list can be sorted via drag
       &amp; drop, no elements can be added or deleted.  </li>
-
-<p><p>  <li>colorpicker,RGB - create an RGB colorpicker</li>
-
-  <li>colorpicker,HSV - create an HSV colorpicker to set an rgb value</li>
-
-  <li>colorpicker,HSVp - create an HSV popup colorpicker to set an rgb value</li>
-
-  <li>colorpicker,HSV,&lt;hue&gt;,&lt;min&gt;,&lt;step&gt;,&lt;max&gt;,&lt;sat&gt,&lt;min&gt;,&lt;step&gt;,&lt;max&gt;,&lt;bri&gt,&lt;min&gt;,&lt;step&gt;,&lt;max&gt;
-      - create an HSV colorpicker that uses &lt;hue&gt;, &lt;sat&gt; and &lt;bri&gt; as commands
-      to set the color. can also be used with HSVp to create a popup colorpicker<br>
-      if the device has no combined hsv reading it can be create with the following user reading:<code>attr <device> userReadings hsv {ReadingsVal($name,'hue','0').','.ReadingsVal($name,'sat','100').','.ReadingsVal($name,'bri','100')}</code></li>
-
-  <li>colorpicker,CT,&lt;min&gt;,&lt;step&gt;,&lt;max&gt; - create a color temperature colorpicker</li>
-
-  <li>colorpicker,BRI,&lt;min&gt;,&lt;step&gt;,&lt;max&gt; - create a brightness colorpicker</li>
-
-  <li>colorpicker,HUE,&lt;min&gt;,&lt;step&gt;,&lt;max&gt; - create a hue colorpicker</li>
-  please see the fhem wiki <a href='https://wiki.fhem.de/wiki/Color#Colorpicker'>Color</a> section for example screenshots.<br><br>
 
 <p>  <li>uzsuToggle,state1,state2 - dispay a toggle button with two possible
       states. the first is the active state.</li>
